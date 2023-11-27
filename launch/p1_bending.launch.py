@@ -41,7 +41,6 @@ def generate_launch_description():
     ######################################################################
     # PREPARE THE LAUNCH ELEMENTS
 
-    # Configure a node for the robot_state_publisher.
     node_robot_state_publisher = Node(
         name       = 'robot_state_publisher', 
         package    = 'robot_state_publisher',
@@ -58,21 +57,12 @@ def generate_launch_description():
         arguments  = ['-d', rvizcfg],
         on_exit    = Shutdown())
 
-    # Configure a node for the GUI.
-    node_gui = Node(
-        name       = 'gui', 
-        package    = 'joint_state_publisher_gui',
-        executable = 'joint_state_publisher_gui',
-        output     = 'screen',
-        on_exit    = Shutdown())
-
-    # Configure a node for the pirouette demo.
-    node_bend = Node(
+    # Configure a node for the demo.
+    node_p1_bending = Node(
         name       = 'p1_bending',
         package    = '133afinal',
         executable = 'p1_bending',
-        output     = 'screen',
-        on_exit    = Shutdown())
+        output     = 'screen')
 
 
     ######################################################################
@@ -82,6 +72,5 @@ def generate_launch_description():
         # Start the robot_state_publisher, RVIZ, the GUI, and the demo.
         node_robot_state_publisher,
         node_rviz,
-        # node_gui,
-        node_bend,
+        node_p1_bending,
     ])

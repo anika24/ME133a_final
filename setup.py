@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            '133amovement1 = 133afinal.p1_bending:main',
+            'p1_bending = 133afinal.p1_bending:main',
+            'p1_bending2 = 133afinal.p1_bending2:main',
         ],
     },
 )

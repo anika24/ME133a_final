@@ -66,7 +66,7 @@ def generate_launch_description():
         output     = 'screen',
         on_exit    = Shutdown())
 
-    # Configure a node for the pirouette demo.
+    # Configure a node for the demo.
     node_bend = Node(
         name       = 'p1_bending',
         package    = '133afinal',
