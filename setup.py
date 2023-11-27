@@ -25,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'p1_bending = 133afinal.p1_bending:main',
-            'p1_bending2 = 133afinal.p1_bending2:main',
         ],
     },
 )
