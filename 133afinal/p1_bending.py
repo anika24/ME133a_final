@@ -1,4 +1,4 @@
-'''pirouette.py
+'''p1_bending.py
 
    This is a demo for moving/placing an ungrounded robot
 
@@ -13,10 +13,13 @@
 import rclpy
 import numpy as np
 
+from math import pi, sin, cos, acos, atan2, sqrt, fmod, exp
+
 from rclpy.node                 import Node
 from rclpy.time                 import Duration
 from tf2_ros                    import TransformBroadcaster
 from geometry_msgs.msg          import TransformStamped
+from sensor_msgs.msg            import JointState
 
 from demos.TransformHelpers     import *
 
@@ -24,17 +27,21 @@ from demos.TransformHelpers     import *
 jointnames = ['leftHipYaw', 'leftHipRoll', 'leftHipPitch', 
               'leftKneePitch', 'leftAnklePitch', 'leftAnkleRoll',
 
-              'rightHipYaw', 'righHipRoll', 'rightHi,pPitch', 
-              'righKneePitch', 'righAnklePitch', 'rightAnkleRoll'
+              'rightHipYaw', 'rightHipRoll', 'rightHipPitch', 
+              'rightKneePitch', 'rightAnklePitch', 'rightAnkleRoll',
 
               'torsoYaw', 'torsoPitch', 'torsoRoll',
               'lowerNeckPitch', 'neckYaw', 'upperNeckPitch',
 
               'rightShoulderPitch', 'rightShoulderRoll', 'rightShoulderYaw', 
               'rightElbowPitch', 'rightForearmYaw', 'rightWristRoll', 'rightWristPitch',
+              'rightThumbRoll', 'rightThumbPitch1', 'rightIndexFingerPitch1', 'rightMiddleFingerPitch1',
+              'rightPinkyPitch1',
 
               'leftShoulderPitch', 'leftShoulderRoll', 'leftShoulderYaw', 
-              'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch'
+              'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch',
+              'leftThumbRoll', 'leftThumbPitch1', 'leftIndexFingerPitch1', 'leftMiddleFingerPitch1',
+              'leftPinkyPitch1',
             ]
 
 #
@@ -48,6 +55,15 @@ class DemoNode(Node):
 
         # Initialize the transform broadcaster
         self.broadcaster = TransformBroadcaster(self)
+
+        # Add a publisher to send the joint commands.
+        self.pub = self.create_publisher(JointState, '/joint_states', 10)
+
+        # Wait for a connection to happen.  This isn't necessary, but
+        # means we don't start until the rest of the system is ready.
+        self.get_logger().info("Waiting for a /joint_states subscriber...")
+        while(not self.count_subscribers('/joint_states')):
+            pass
 
         # Set up the timing so (t=0) will occur in the first update
         # cycle (dt) from now.
@@ -76,7 +92,7 @@ class DemoNode(Node):
         self.t += self.dt
 
         # Compute position/orientation of the pelvis (w.r.t. world).
-        ppelvis = pxyz(0.0, 0.5, 1.5 + 0.5 * np.sin(self.t/2))
+        ppelvis = pxyz(0.0, 0.5, 0.5 * np.sin(self.t/2))
         Rpelvis = Rotz(np.sin(self.t))
         Tpelvis = T_from_Rp(Rpelvis, ppelvis)
         
@@ -89,21 +105,25 @@ class DemoNode(Node):
         self.broadcaster.sendTransform(trans)
 
         # Compute the joints.
-        # q    = np.zeros((len(jointnames), 1))
-        # qdot = np.zeros((len(jointnames), 1))
+        q    = np.zeros((len(jointnames), 1))
+        qdot = np.zeros((len(jointnames), 1))
 
-        # i_relbow = jointnames.index('rightElbowPitch')
+        i_relbow = jointnames.index('rightElbowPitch')
+        i_rshoulder_yaw = jointnames.index('rightShoulderYaw')
+        i_rforearm_yaw = jointnames.index('rightForearmYaw')
 
-        # q[i_relbow,0]     = - pi/2 + pi/8 * sin(2*self.t)
-        # qdot[i_relbow, 0] =          pi/4 * cos(2*self.t)
+        q[i_relbow,0]     = - pi/2 + pi/8 * sin(2*self.t)
+        q[i_rshoulder_yaw,0]     = pi/2
+        q[i_rforearm_yaw,0]     = -pi/2
+        qdot[i_relbow, 0] =          pi/4 * cos(2*self.t)
 
-        # # Build up a command message and publish.
-        # cmdmsg = JointState()
-        # cmdmsg.header.stamp = self.now().to_msg()       # Current time for ROS
-        # cmdmsg.name         = jointnames                # List of names
-        # cmdmsg.position     = q.flatten().tolist()      # List of positions
-        # cmdmsg.velocity     = qdot.flatten().tolist()   # List of velocities
-        # self.pub.publish(cmdmsg)
+        # Build up a command message and publish.
+        cmdmsg = JointState()
+        cmdmsg.header.stamp = self.now().to_msg()       # Current time for ROS
+        cmdmsg.name         = jointnames                # List of names
+        cmdmsg.position     = q.flatten().tolist()      # List of positions
+        cmdmsg.velocity     = qdot.flatten().tolist()   # List of velocities
+        self.pub.publish(cmdmsg)
 
 
 #
@@ -112,7 +132,7 @@ class DemoNode(Node):
 def main(args=None):
     # Initialize ROS and the demo node (100Hz).
     rclpy.init(args=args)
-    node = DemoNode('pirouette', 100)
+    node = DemoNode('p1_bending', 100)
 
     # Spin, until interrupted.
     rclpy.spin(node)
