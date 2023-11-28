@@ -184,10 +184,14 @@ class Trajectory():
         self.q_right_leg = np.zeros((6, 1))
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
+        self.q[1], self.q[3] = 0.1, -0.1
+        self.q[7], self.q[9] = 0.1, -0.2
 
         # Set up initial positions for the chain tips, with respect to the pelvis
         self.pos_left_leg = (np.array([-0.010126, 0.1377, -1.0834]).reshape((-1, 1)), R_from_quat(np.array([0, 0, 0, 1])))
         self.pos_right_leg = (np.array([-0.010126, -0.1377, -1.0834]).reshape((-1, 1)), R_from_quat(np.array([0, 0, 0, 1])))
+
+        self.qgoal = np.zeros((12, 1))
 
         self.amp = 0.5
         self.period = 0.5
@@ -234,8 +238,11 @@ class Trajectory():
 
         v = np.zeros((12, 1))
         e = np.vstack((ep_ll, er_ll, ep_rl, er_rl))
-
-        qdot = np.linalg.pinv(J) @ (v + self.lam * e)
+        
+        gamma = 0.15
+        Jinv_W = np.linalg.inv(np.transpose(J) @ J + gamma ** 2 * np.eye(12)) @ np.transpose(J)
+        qdot_s = 10*(self.qgoal - qlast)
+        qdot = Jinv_W @ (v + self.lam * e)
         q = qlast + dt * qdot
         self.q_left_leg = q[:6]
         self.q_right_leg = q[6:]
