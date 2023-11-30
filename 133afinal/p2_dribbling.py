@@ -138,7 +138,8 @@ class GeneratorNode(Node):
             return
         (q, qdot) = desired
 
-        ppelvis = pxyz(0.0, 0, -0.3 * abs(np.sin(self.t/2)))
+        # ppelvis = pxyz(0.0, 0, -0.3 * abs(np.sin(self.t/2)))
+        ppelvis = pxyz(0.0, -0.25 * np.sin(self.t), -0.1)
         # Rpelvis = Rotz(np.sin(self.t))
         Rpelvis = Reye()
         Tpelvis = T_from_Rp(Rpelvis, ppelvis)
@@ -176,6 +177,7 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         #   Set up the kinematic chain object.
+        joints = self.jointnames()
         self.chain_left_leg = KinematicChain(node, 'pelvis', 'leftFoot', joint_names['left_leg'])
         self.chain_right_leg = KinematicChain(node, 'pelvis', 'rightFoot', joint_names['right_leg'])
 
@@ -184,15 +186,21 @@ class Trajectory():
         self.q_right_leg = np.zeros((6, 1))
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
-        self.q[0], self.q[6] = 0.2, 0.2
-        self.q[3], self.q[9] = 0.1, 0.1
+        # self.q[0], self.q[6] = 0.2, 0.2
+        self.q[joints.index('leftKneePitch')], self.q[joints.index('rightKneePitch')] = 0.1, 0.1
+        self.q[joints.index('torsoPitch')] = 0.4
+        self.q[joints.index('rightShoulderRoll')], self.q[joints.index('leftShoulderRoll')] = 1.2, -1.2
+        self.q[joints.index('rightElbowPitch')], self.q[joints.index('leftElbowPitch')] = 0.4, -0.4
+        self.q[joints.index('leftForearmYaw')], self.q[joints.index('rightForearmYaw')] = 1.2, 1.2
+        self.q[joints.index('rightShoulderPitch')], self.q[joints.index('leftShoulderPitch')] = -0.75, -0.75
+        
 
         # Set up initial positions for the chain tips, with respect to the pelvis
-        self.pos_left_leg = (np.array([0.010126, 0.1377, -1.0834]).reshape((-1, 1)), Reye())
-        self.pos_right_leg = (np.array([0.010126, -0.1377, -1.0834]).reshape((-1, 1)), Reye())
+        self.pos_left_leg = (np.array([0.010126, 0.1377, -1.0834 + 0.1]).reshape((-1, 1)), Reye())
+        self.pos_right_leg = (np.array([0.010126, -0.1377, -1.0834 + 0.1]).reshape((-1, 1)), Reye())
 
         self.qgoal = np.zeros((12, 1))
-        self.qgoal[0], self.qgoal[6] = 0.2, 0.2
+        # self.qgoal[0], self.qgoal[6] = 0.2, 0.2
         self.qgoal[3], self.qgoal[9] = 0.1, 0.1
 
         self.amp = 0.5
@@ -206,61 +214,56 @@ class Trajectory():
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        # if 0 < t < 2*pi:
+        # Compute the joints.
+        left_leg_qlast = self.q_left_leg
+        right_leg_qlast = self.q_right_leg
+        qlast = self.q[:12]
 
-            # Compute the joints.
-            left_leg_qlast = self.q_left_leg
-            right_leg_qlast = self.q_right_leg
-            qlast = self.q[:12]
+        # pelvis w/ respect to world
+        ppelvis = pxyz(0, -0.25 * np.sin(t), -0.1)
+        Rpelvis = Reye()
 
-            # pelvis w/ respect to world
-            ppelvis = pxyz(0.0, 0.0, -0.3 * abs(np.sin(t/2)))
-            Rpelvis = Reye()
+        # left and right leg w/ respect to pelvis
+        (pleftleg, Rleftleg, Jllpelvis_v, Jllpelvis_w) = self.chain_left_leg.fkin(left_leg_qlast)
+        (prightleg, Rrightleg, Jrlpelvis_v, Jrlpelvis_w) = self.chain_left_leg.fkin(right_leg_qlast)
 
-            # left and right leg w/ respect to pelvis
-            (pleftleg, Rleftleg, Jllpelvis_v, Jllpelvis_w) = self.chain_left_leg.fkin(left_leg_qlast)
-            (prightleg, Rrightleg, Jrlpelvis_v, Jrlpelvis_w) = self.chain_left_leg.fkin(right_leg_qlast)
+        Tpelvis_world = T_from_Rp(Rpelvis, ppelvis)
+        Tleftleg_pelvis = T_from_Rp(Rleftleg, pleftleg)
+        Trightleg_pelvis = T_from_Rp(Rrightleg, prightleg)
 
-            Tpelvis_world = T_from_Rp(Rpelvis, ppelvis)
-            Tleftleg_pelvis = T_from_Rp(Rleftleg, pleftleg)
-            Trightleg_pelvis = T_from_Rp(Rrightleg, prightleg)
+        # left and right leg w/ respect to world
+        Tleftleg_world = Tpelvis_world @ Tleftleg_pelvis
+        Trightleg_world = Tpelvis_world @ Trightleg_pelvis
+        pleftleg_world, Rleftleg_world = p_from_T(Tleftleg_world), R_from_T(Tleftleg_world)
+        prightleg_world, Rrightleg_world = p_from_T(Trightleg_world), R_from_T(Trightleg_world)
+        # print(f'left {pleftleg_world} \n right {prightleg_world} \n')
+        # pleftleg_world = ppelvis + pleftleg
+        # prightleg_world = ppelvis + prightleg
 
-            # left and right leg w/ respect to world
-            Tleftleg_world = Tpelvis_world @ Tleftleg_pelvis
-            Trightleg_world = Tpelvis_world @ Trightleg_pelvis
-            pleftleg_world, Rleftleg_world = p_from_T(Tleftleg_world), R_from_T(Tleftleg_world)
-            prightleg_world, Rrightleg_world = p_from_T(Trightleg_world), R_from_T(Trightleg_world)
-            # print(f'left {pleftleg_world} \n right {prightleg_world} \n')
-            # pleftleg_world = ppelvis + pleftleg
-            # prightleg_world = ppelvis + prightleg
+        ep_ll, er_ll = ep(self.pos_left_leg[0], pleftleg_world), eR(self.pos_left_leg[1], Rleftleg_world)
+        ep_rl, er_rl = ep(self.pos_right_leg[0], prightleg_world), eR(self.pos_right_leg[1], Rrightleg_world)
 
-            ep_ll, er_ll = ep(self.pos_left_leg[0], pleftleg_world), eR(self.pos_left_leg[1], Rleftleg_world)
-            ep_rl, er_rl = ep(self.pos_right_leg[0], prightleg_world), eR(self.pos_right_leg[1], Rrightleg_world)
+        J_ll = np.vstack((Jllpelvis_v, Jllpelvis_w))
+        J_rl = np.vstack((Jrlpelvis_v, Jrlpelvis_w))
+        J = np.block([[J_ll, np.zeros_like(J_ll)],
+                    [np.zeros_like(J_rl), J_rl]])
 
-            J_ll = np.vstack((Jllpelvis_v, Jllpelvis_w))
-            J_rl = np.vstack((Jrlpelvis_v, Jrlpelvis_w))
-            J = np.block([[J_ll, np.zeros_like(J_ll)],
-                        [np.zeros_like(J_rl), J_rl]])
-
-            v = np.zeros((12, 1))
-            v[:3] = pxyz(0.0, 0.0, -0.15 * cos(t/2) * sin(t/2) / abs(sin(t/2))) if t/2 % (2 * pi) != 0 else pxyz(0, 0, 0)
-            e = np.vstack((ep_ll, er_ll, ep_rl, er_rl))
-            
-            gamma = 0.1
-            Jinv_W = np.linalg.inv(np.transpose(J) @ J + gamma ** 2 * np.eye(12)) @ np.transpose(J)
-            qlast_modified = np.array([0, 0, 0, qlast[3,0], 0, 0, 0, 0, 0, qlast[9,0], 0, 0]).reshape(-1, 1)
-            qdot_s = 10*(self.qgoal - qlast_modified)
-            # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(12) - Jinv_W @ J) @ qdot_s
-            qdot = Jinv_W @ (v + self.lam * e)
-            q = qlast + dt * qdot
-            self.q_left_leg = q[:6]
-            self.q_right_leg = q[6:]
-            self.q[:12] = q
-            self.qdot[:12] = qdot
-
-            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+        v = np.zeros((12, 1))
+        e = np.vstack((ep_ll, er_ll, ep_rl, er_rl))
         
-        # return np.zeros((42, 1)).flatten().tolist(), np.zeros((42, 1)).flatten().tolist()
+        gamma = 0.1
+        Jinv_W = np.linalg.inv(np.transpose(J) @ J + gamma ** 2 * np.eye(12)) @ np.transpose(J)
+        qlast_modified = np.array([0, 0, 0, qlast[3,0], 0, 0, 0, 0, 0, qlast[9,0], 0, 0]).reshape(-1, 1)
+        qdot_s = 10*(self.qgoal - qlast_modified)
+        # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(12) - Jinv_W @ J) @ qdot_s
+        qdot = Jinv_W @ (v + self.lam * e)
+        q = qlast + dt * qdot
+        self.q_left_leg = q[:6]
+        self.q_right_leg = q[6:]
+        self.q[:12] = q
+        self.qdot[:12] = qdot
+
+        return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
 
 
 #

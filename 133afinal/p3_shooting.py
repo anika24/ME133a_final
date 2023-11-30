@@ -1,12 +1,12 @@
-'''p1_bending.py
+'''p3_shooting.py
 
    This is a demo for moving/placing an ungrounded robot
 
    In particular, imagine a humanoid robot.  This moves/rotates the
    pelvis frame relative to the world.
 
-   Node:        /pirouette
-   Broadcast:   'pelvis' w.r.t. 'world'     geometry_msgs/TransformStamped
+   Node:        /p3_shooting
+   Broadcast:   'rightPalm' w.r.t. 'world'     geometry_msgs/TransformStamped
 
 '''
 
@@ -38,13 +38,15 @@ joint_names = {
                 'rightAnkleRoll'],
 
     'left_arm': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'leftShoulderPitch', 'leftShoulderRoll',
-                'leftShoulderYaw', 'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch', 
-                'leftThumbRoll', 'leftThumbPitch1', 'leftIndexFingerPitch1', 'leftMiddleFingerPitch1',
+                'leftShoulderYaw', 'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch'],
+
+    'left_hand': ['leftThumbRoll', 'leftThumbPitch1', 'leftIndexFingerPitch1', 'leftMiddleFingerPitch1',
                 'leftPinkyPitch1'],
 
     'right_arm': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'rightShoulderPitch', 'rightShoulderRoll',
-                'rightShoulderYaw', 'rightElbowPitch', 'rightForearmYaw', 'rightWristRoll', 'rightWristPitch', 
-                'rightThumbRoll', 'rightThumbPitch1', 'rightIndexFingerPitch1', 'rightMiddleFingerPitch1',
+                'rightShoulderYaw', 'rightElbowPitch', 'rightForearmYaw', 'rightWristRoll', 'rightWristPitch'],
+
+    'right_hand': ['rightThumbRoll', 'rightThumbPitch1', 'rightIndexFingerPitch1', 'rightMiddleFingerPitch1',
                 'rightPinkyPitch1'],
                 
     'neck': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'lowerNeckPitch', 'neckYaw', 'upperNeckPitch']
@@ -138,17 +140,16 @@ class GeneratorNode(Node):
             return
         (q, qdot) = desired
 
-        ppelvis = pxyz(0.0, 0, -0.3 * abs(np.sin(self.t/2)))
-        # Rpelvis = Rotz(np.sin(self.t))
-        Rpelvis = Reye()
-        Tpelvis = T_from_Rp(Rpelvis, ppelvis)
+        # ppelvis = pxyz(0.0, 0.0, 0.0)
+        # Rpelvis = Reye()
+        # Tpelvis = T_from_Rp(Rpelvis, ppelvis)
         
-        trans = TransformStamped()
-        trans.header.stamp    = self.now().to_msg()
-        trans.header.frame_id = 'world'
-        trans.child_frame_id  = 'pelvis'
-        trans.transform       = Transform_from_T(Tpelvis)
-        self.broadcaster.sendTransform(trans)
+        # trans = TransformStamped()
+        # trans.header.stamp    = self.now().to_msg()
+        # trans.header.frame_id = 'world'
+        # trans.child_frame_id  = 'pelvis'
+        # trans.transform       = Transform_from_T(Tpelvis)
+        # self.broadcaster.sendTransform(trans)
 
         # Check the results.
         if not (isinstance(q, list) and isinstance(qdot, list)):
@@ -176,92 +177,112 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         #   Set up the kinematic chain object.
+        joints = self.jointnames()
+        self.node = node
         self.chain_left_leg = KinematicChain(node, 'pelvis', 'leftFoot', joint_names['left_leg'])
         self.chain_right_leg = KinematicChain(node, 'pelvis', 'rightFoot', joint_names['right_leg'])
+        self.chain_right_arm = KinematicChain(node, 'pelvis', 'rightPalm', joint_names['right_arm'])
+        self.chain_left_arm = KinematicChain(node, 'pelvis', 'leftPalm', joint_names['left_arm'])
 
-        # Initial q0 is 0
-        self.q_left_leg = np.zeros((6, 1))
-        self.q_right_leg = np.zeros((6, 1))
+        # Initial q
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
-        self.q[0], self.q[6] = 0.2, 0.2
-        self.q[3], self.q[9] = 0.1, 0.1
-
-        # Set up initial positions for the chain tips, with respect to the pelvis
-        self.pos_left_leg = (np.array([0.010126, 0.1377, -1.0834]).reshape((-1, 1)), Reye())
-        self.pos_right_leg = (np.array([0.010126, -0.1377, -1.0834]).reshape((-1, 1)), Reye())
-
-        self.qgoal = np.zeros((12, 1))
-        self.qgoal[0], self.qgoal[6] = 0.2, 0.2
-        self.qgoal[3], self.qgoal[9] = 0.1, 0.1
-
-        self.amp = 0.5
-        self.period = 0.5
+        self.q[joints.index('leftKneePitch')], self.q[joints.index('rightKneePitch')] = 0.2, 0.2
+        
+        # Set up initial positions for the chain tips
+        self.pos_ll_world = (np.array([0.010126, 0.1377, -1.0834 + 0.2]).reshape((-1, 1)), Reye())
+        self.pos_rl_world = (np.array([0.010126, -0.1377, -1.0834 + 0.2]).reshape((-1, 1)), Reye())
+        self.pos_pelvis_world = (np.array([0, 0, -0.2]).reshape((-1, 1)), Reye())
+        
+        # Other constants
         self.lam = 20
+
+    def get_some_q(self, q, chain):
+        curr_joints = joint_names[chain]
+        all_joints = self.jointnames()
+        indices = [all_joints.index(x) for x in curr_joints]
+        return q[indices]
 
     # Declare the joint names.
     def jointnames(self):
         # Return a list of joint names FOR THE EXPECTED URDF!
-        return joint_names['left_leg'] + joint_names['right_leg'] + joint_names['neck'] + joint_names['left_arm'][3:] + joint_names['right_arm'][3:]
+        return joint_names['left_leg'] + joint_names['right_leg'] + joint_names['neck'] + joint_names['left_arm'][3:] + joint_names['left_hand'] + joint_names['right_arm'][3:] + joint_names['right_hand']
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        # if 0 < t < 2*pi:
-
-            # Compute the joints.
-            left_leg_qlast = self.q_left_leg
-            right_leg_qlast = self.q_right_leg
-            qlast = self.q[:12]
-
-            # pelvis w/ respect to world
-            ppelvis = pxyz(0.0, 0.0, -0.3 * abs(np.sin(t/2)))
-            Rpelvis = Reye()
-
-            # left and right leg w/ respect to pelvis
-            (pleftleg, Rleftleg, Jllpelvis_v, Jllpelvis_w) = self.chain_left_leg.fkin(left_leg_qlast)
-            (prightleg, Rrightleg, Jrlpelvis_v, Jrlpelvis_w) = self.chain_left_leg.fkin(right_leg_qlast)
-
-            Tpelvis_world = T_from_Rp(Rpelvis, ppelvis)
-            Tleftleg_pelvis = T_from_Rp(Rleftleg, pleftleg)
-            Trightleg_pelvis = T_from_Rp(Rrightleg, prightleg)
-
-            # left and right leg w/ respect to world
-            Tleftleg_world = Tpelvis_world @ Tleftleg_pelvis
-            Trightleg_world = Tpelvis_world @ Trightleg_pelvis
-            pleftleg_world, Rleftleg_world = p_from_T(Tleftleg_world), R_from_T(Tleftleg_world)
-            prightleg_world, Rrightleg_world = p_from_T(Trightleg_world), R_from_T(Trightleg_world)
-            # print(f'left {pleftleg_world} \n right {prightleg_world} \n')
-            # pleftleg_world = ppelvis + pleftleg
-            # prightleg_world = ppelvis + prightleg
-
-            ep_ll, er_ll = ep(self.pos_left_leg[0], pleftleg_world), eR(self.pos_left_leg[1], Rleftleg_world)
-            ep_rl, er_rl = ep(self.pos_right_leg[0], prightleg_world), eR(self.pos_right_leg[1], Rrightleg_world)
-
-            J_ll = np.vstack((Jllpelvis_v, Jllpelvis_w))
-            J_rl = np.vstack((Jrlpelvis_v, Jrlpelvis_w))
-            J = np.block([[J_ll, np.zeros_like(J_ll)],
-                        [np.zeros_like(J_rl), J_rl]])
-
-            v = np.zeros((12, 1))
-            v[:3] = pxyz(0.0, 0.0, -0.15 * cos(t/2) * sin(t/2) / abs(sin(t/2))) if t/2 % (2 * pi) != 0 else pxyz(0, 0, 0)
-            e = np.vstack((ep_ll, er_ll, ep_rl, er_rl))
-            
-            gamma = 0.1
-            Jinv_W = np.linalg.inv(np.transpose(J) @ J + gamma ** 2 * np.eye(12)) @ np.transpose(J)
-            qlast_modified = np.array([0, 0, 0, qlast[3,0], 0, 0, 0, 0, 0, qlast[9,0], 0, 0]).reshape(-1, 1)
-            qdot_s = 10*(self.qgoal - qlast_modified)
-            # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(12) - Jinv_W @ J) @ qdot_s
-            qdot = Jinv_W @ (v + self.lam * e)
-            q = qlast + dt * qdot
-            self.q_left_leg = q[:6]
-            self.q_right_leg = q[6:]
-            self.q[:12] = q
-            self.qdot[:12] = qdot
-
-            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+        # Compute the joints.
+        if t >= 3:
+            return None
         
-        # return np.zeros((42, 1)).flatten().tolist(), np.zeros((42, 1)).flatten().tolist()
+        # Desired trajectory of right palm with respect to both legs:
+        if t < 3:
+            p_rh_world = pxyz(0.05 * t, 0.1, 0.2 * t)
+            v_rh_world = pxyz(0.05, 0, 0.2)
 
+        qlast = self.q
+        (p_rh_pelvis, R_rh_pelvis, Jv_rh_pelvis, Jw_rh_pelvis) = self.chain_right_arm.fkin(self.get_some_q(qlast, 'right_arm')) 
+        (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg')) 
+        (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
+
+        # Finding locations and rotations with respect to new frames
+        T_rh_ll = np.linalg.inv(T_from_Rp(R_ll_pelvis, p_ll_pelvis)) @ T_from_Rp(R_rh_pelvis, p_rh_pelvis)
+        p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
+
+        T_rh_rl = np.linalg.inv(T_from_Rp(R_rl_pelvis, p_rl_pelvis)) @ T_from_Rp(R_rh_pelvis, p_rh_pelvis)
+        p_rh_rl, R_rh_rl = p_from_T(T_rh_rl), R_from_T(T_rh_rl)
+
+        T_pelvis_world = T_from_Rp(Reye(), p_rh_world) @ np.linalg.inv(T_from_Rp(R_rh_pelvis, p_rh_pelvis))
+        new_pos_pelvis = p_from_T(T_pelvis_world), R_from_T(T_pelvis_world)
+
+        # Jacobians of right hand w/ respect to each leg
+        J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
+                             np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
+        e_rh_ll = np.vstack((ep(p_rh_ll, p_rh_pelvis - p_ll_pelvis), eR(R_rh_ll, np.linalg.inv(R_ll_pelvis) @ R_rh_pelvis)))
+
+        J_rh_rl = np.vstack((np.transpose(R_rl_pelvis) @ (np.block([[np.zeros_like(Jv_rl_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_rl_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
+                             np.transpose(R_rl_pelvis) @ (np.block([[np.zeros_like(Jw_rl_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_rl_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
+        e_rh_rl = np.vstack((ep(p_rh_rl, p_rh_pelvis - p_rl_pelvis), eR(R_rh_rl, np.linalg.inv(R_rl_pelvis) @ R_rh_pelvis)))
+
+        # Jacobians of each leg w/ respsect to pelvis
+        J_ll_pelvis = np.vstack((Jv_ll_pelvis, Jw_ll_pelvis))
+        e_ll_pelvis = np.vstack((ep(-new_pos_pelvis[0] + self.pos_ll_world[0], p_ll_pelvis), eR(new_pos_pelvis[1], self.pos_ll_world[1])))
+        J_rl_pelvis = np.vstack((Jv_rl_pelvis, Jw_rl_pelvis))
+        e_rl_pelvis = np.vstack((ep(-new_pos_pelvis[0] + self.pos_rl_world[0], p_rl_pelvis), eR(new_pos_pelvis[1], self.pos_rl_world[1])))
+
+        e = np.vstack((e_rh_ll, e_rh_rl, e_ll_pelvis, e_rl_pelvis))
+        v = np.zeros((24, 1))
+        v[:3] = v_rh_world
+        v[6:9] = v_rh_world
+        v[12:15] = -(new_pos_pelvis[0] - self.pos_pelvis_world[0]) / dt
+        v[18:21] = -(new_pos_pelvis[0] - self.pos_pelvis_world[0]) / dt
+
+        J = np.block([
+                        [J_rh_ll[:,:6], np.zeros((6, 6)), J_rh_ll[:,6:9], np.zeros((6, 3)), np.zeros((6, 12)), J_rh_ll[:,9:], np.zeros((6, 5))],
+                        [np.zeros((6, 6)), J_rh_rl[:,:6], J_rh_rl[:,6:9], np.zeros((6, 3)), np.zeros((6, 12)), J_rh_rl[:,9:], np.zeros((6, 5))],
+                        [J_ll_pelvis, np.zeros((6, 6)), np.zeros((6, 6)), np.zeros((6, 12)), np.zeros((6, 12))],
+                        [np.zeros((6, 6)), J_rl_pelvis, np.zeros((6, 6)), np.zeros((6, 12)), np.zeros((6, 12))]
+                    ])
+
+        qdot = np.linalg.pinv(J) @ (v + self.lam * e)
+        q = qlast + dt * qdot
+        self.q = q
+        
+        # Broadcasting pelvis
+        broadcast = self.node.broadcaster
+        now = self.node.now()
+        
+        trans = TransformStamped()
+        trans.header.stamp    = now.to_msg()
+
+        trans.header.frame_id = 'world'
+        trans.child_frame_id  = 'pelvis'
+        trans.transform       = Transform_from_T(T_from_Rp(self.pos_pelvis_world[1], self.pos_pelvis_world[0]))
+        broadcast.sendTransform(trans)
+        self.pos_pelvis_world = new_pos_pelvis
+
+        # q = np.zeros((42, 1))
+        # qdot = np.zeros((42, 1))
+        return (q.flatten().tolist(), qdot.flatten().tolist())
 
 #
 #  Main Code

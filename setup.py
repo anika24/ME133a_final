@@ -25,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'p1_bending = 133afinal.p1_bending:main',
+            'p2_dribbling = 133afinal.p2_dribbling:main',
+            'p3_shooting = 133afinal.p3_shooting:main'
         ],
     },
 )
