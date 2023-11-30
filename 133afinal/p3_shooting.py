@@ -211,14 +211,27 @@ class Trajectory():
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # Compute the joints.
-        if t >= 3:
+        if t >= 4:
             return None
         
         # Desired trajectory of right palm with respect to both legs:
-        if t < 3:
+        if t < 4:
             p_rh_world = pxyz(0.05 * t, 0.1, 0.2 * t)
             v_rh_world = pxyz(0.05, 0, 0.2)
 
+        # Broadcasting pelvis
+        broadcast = self.node.broadcaster
+        now = self.node.now()
+        
+        trans = TransformStamped()
+        trans.header.stamp    = now.to_msg()
+
+        trans.header.frame_id = 'world'
+        trans.child_frame_id  = 'pelvis'
+        trans.transform       = Transform_from_T(T_from_Rp(self.pos_pelvis_world[1], self.pos_pelvis_world[0]))
+        broadcast.sendTransform(trans)
+
+        # Fkin
         qlast = self.q
         (p_rh_pelvis, R_rh_pelvis, Jv_rh_pelvis, Jw_rh_pelvis) = self.chain_right_arm.fkin(self.get_some_q(qlast, 'right_arm')) 
         (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg')) 
@@ -237,17 +250,19 @@ class Trajectory():
         # Jacobians of right hand w/ respect to each leg
         J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
                              np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
-        e_rh_ll = np.vstack((ep(p_rh_ll, p_rh_pelvis - p_ll_pelvis), eR(R_rh_ll, np.linalg.inv(R_ll_pelvis) @ R_rh_pelvis)))
+       
+        e_rh_ll = np.vstack((ep(-self.pos_ll_world[0] + p_rh_world, p_rh_ll), eR(Reye(), R_rh_ll)))
 
         J_rh_rl = np.vstack((np.transpose(R_rl_pelvis) @ (np.block([[np.zeros_like(Jv_rl_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_rl_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
                              np.transpose(R_rl_pelvis) @ (np.block([[np.zeros_like(Jw_rl_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_rl_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
-        e_rh_rl = np.vstack((ep(p_rh_rl, p_rh_pelvis - p_rl_pelvis), eR(R_rh_rl, np.linalg.inv(R_rl_pelvis) @ R_rh_pelvis)))
+        
+        e_rh_rl = np.vstack((ep(-self.pos_rl_world[0] + p_rh_world, p_rh_rl), eR(Reye(), R_rh_rl)))
 
         # Jacobians of each leg w/ respsect to pelvis
         J_ll_pelvis = np.vstack((Jv_ll_pelvis, Jw_ll_pelvis))
-        e_ll_pelvis = np.vstack((ep(-new_pos_pelvis[0] + self.pos_ll_world[0], p_ll_pelvis), eR(new_pos_pelvis[1], self.pos_ll_world[1])))
+        e_ll_pelvis = np.vstack((ep(-self.pos_pelvis_world[0] + self.pos_ll_world[0], p_ll_pelvis), eR(Reye(), Reye())))
         J_rl_pelvis = np.vstack((Jv_rl_pelvis, Jw_rl_pelvis))
-        e_rl_pelvis = np.vstack((ep(-new_pos_pelvis[0] + self.pos_rl_world[0], p_rl_pelvis), eR(new_pos_pelvis[1], self.pos_rl_world[1])))
+        e_rl_pelvis = np.vstack((ep(-self.pos_pelvis_world[0] + self.pos_rl_world[0], p_rl_pelvis), eR(Reye(), Reye())))
 
         e = np.vstack((e_rh_ll, e_rh_rl, e_ll_pelvis, e_rl_pelvis))
         v = np.zeros((24, 1))
@@ -266,18 +281,6 @@ class Trajectory():
         qdot = np.linalg.pinv(J) @ (v + self.lam * e)
         q = qlast + dt * qdot
         self.q = q
-        
-        # Broadcasting pelvis
-        broadcast = self.node.broadcaster
-        now = self.node.now()
-        
-        trans = TransformStamped()
-        trans.header.stamp    = now.to_msg()
-
-        trans.header.frame_id = 'world'
-        trans.child_frame_id  = 'pelvis'
-        trans.transform       = Transform_from_T(T_from_Rp(self.pos_pelvis_world[1], self.pos_pelvis_world[0]))
-        broadcast.sendTransform(trans)
         self.pos_pelvis_world = new_pos_pelvis
 
         # q = np.zeros((42, 1))
