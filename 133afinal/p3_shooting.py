@@ -189,16 +189,15 @@ class Trajectory():
         self.qdot = np.zeros((len(self.jointnames()), 1))
         self.q[joints.index('leftKneePitch')], self.q[joints.index('rightKneePitch')] = 0.3, 0.3
         # self.q[joints.index('torsoPitch')] = 0.2
-        self.q[joints.index('rightShoulderRoll')] = 1.5
-        self.q[joints.index('rightForearmYaw')] = 2.2
-        self.q[joints.index('rightElbowPitch')] = 1.5
-        self.q[joints.index('rightShoulderPitch')] = -0.35
-
+        # self.q[joints.index('rightShoulderRoll')] = 1.5
+        # self.q[joints.index('rightForearmYaw')] = 2.2
+        # self.q[joints.index('rightElbowPitch')] = 1.5
+        # self.q[joints.index('rightShoulderPitch')] = -0.35
         
         # Set up initial positions for the chain tips
-        self.pos_ll_world = (np.array([0.010126, 0.1377, -1.0834]).reshape((-1, 1)), Reye())
-        self.pos_rl_world = (np.array([0.010126, -0.1377, -1.0834]).reshape((-1, 1)), Reye())
-        self.pos_pelvis_world = (np.array([0, 0, 0]).reshape((-1, 1)), Reye())
+        self.pos_ll_world = (np.array([0.010126, 0.1377, -1.0834 + 0.3]).reshape((-1, 1)), Reye())
+        self.pos_rl_world = (np.array([0.010126, -0.1377, -1.0834 + 0.3]).reshape((-1, 1)), Reye())
+        self.pos_pelvis_world = (np.array([0, 0, -0.3]).reshape((-1, 1)), Reye())
         
         # Other constants
         self.lam = 20
