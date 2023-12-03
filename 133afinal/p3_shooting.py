@@ -194,9 +194,9 @@ class Trajectory():
         self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = -1.559, -1.559
         
         # Set up initial positions for the chain tips
-        self.p_ll_world, self.R_ll_world = (np.array([-0.040202, -0.13801, 0.00002]).reshape((-1, 1)), R_from_quat(np.array([0.00024573, 0.0058819, 4.6204e-06, 0.99998])))
-        self.p_rl_world, self.R_rl_world = (np.array([-0.040196, 0.13764, 0.0]).reshape((-1, 1)), R_from_quat(np.array([5.9372e-05, 0.0058819, 7.288e-05, 0.99998])))
-        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.80111]).reshape((-1, 1)), R_from_quat(np.array([0, 0, 0, 1])))
+        self.p_ll_world, self.R_ll_world = (np.array([-0.040262, 0.1377, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.99998, 0, 0.006, 0])))
+        self.p_rl_world, self.R_rl_world = (np.array([-0.040262, -0.1377, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.99998, 0, 0.006, 0])))
+        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.80111]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
 
         # Weighted matrix
         weights = np.ones(42)
@@ -220,7 +220,7 @@ class Trajectory():
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # Compute the joints.
-        if t >= 5 or t <= 3:
+        if t <= 3 or t >= 5:
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
 
             broadcast = self.node.broadcaster
@@ -228,7 +228,6 @@ class Trajectory():
             
             trans = TransformStamped()
             trans.header.stamp    = now.to_msg()
-
             trans.header.frame_id = 'world'
             trans.child_frame_id  = 'pelvis'
             trans.transform       = Transform_from_T(Tpelvis)
@@ -256,18 +255,20 @@ class Trajectory():
             # alpha, alphadot = 0.9 * (t-3), 0.9
             # R_rh_world = Rote(pxyz(0, np.sqrt(2)/2, np.sqrt(2)/2), alpha)
             # wd = ez() * alphadot
-            p_rh_world = pxyz(0.014083, -0.60298, 0.63143+0.80111)
+
+            p_rh_world = pxyz(0.013999, -0.60294, 1.4325)
             v_rh_world = pxyz(0, 0, 0)
-            R_rh_world = R_from_quat(np.array([-0.69191, -0.14921, 0.15891, 0.68829]))
+            R_rh_world = R_from_quat(np.array([0.68821, -0.69206, -0.14921, 0.15861]))
             wd = pxyz(0, 0, 0)
 
             # Define left hand trajectory
             # p_lh_world = pxyz(0.4, 0.15 - 0.1 * (t-3), -0.1  + 0.4 * (t-3))
             # v_lh_world = pxyz(0, -0.1, 0.4)
             # R_lh_world = Reye()
-            p_lh_world = pxyz(0.014042, 0.60303, 0.63137+0.80111)
+
+            p_lh_world = pxyz(0.013999, 0.60294, 1.4325)
             v_lh_world = pxyz(0, 0, 0)
-            R_lh_world = R_from_quat(np.array([0.69199, -0.14915, -0.15855, 0.6883]))
+            R_lh_world = R_from_quat(np.array([0.68821, 0.69206, -0.14921, -0.15861]))
 
             # Fkin
             qlast = self.q
@@ -339,17 +340,16 @@ class Trajectory():
             e_ll_rh = np.vstack((ep(pd_ll_rh, p_ll_rh), eR(Rd_ll_rh, R_ll_rh)))
 
 
-            v = np.zeros((6, 1))
+            v = np.zeros((18, 1))
             # v[6:9] = v_rh_world
             # v[12:15] = v_lh_world
 
-            e = np.vstack((e_rl_ll))
+            e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
             
             J = np.block([
                 [J_rl_ll, np.zeros((6,30))],
-                # [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
-                # [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
-                # [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))]
+                [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
+                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
             ])
 
             gamma = 0.1
