@@ -269,8 +269,10 @@ class Trajectory():
             p_rh_world = pxyz(0.3, -0.2 * (t-3), -0.1 + 0.5 * (t-3))
             v_rh_world = pxyz(0, -0.2, 0.5)
             alpha, alphadot = 0.9 * (t-3), 0.9
-            R_rh_world = Rote(pxyz(0, np.sqrt(2)/2, np.sqrt(2)/2), alpha)
-            wd = ez() * alphadot
+            # R_rh_world = Rote(pxyz(0, np.sqrt(2)/2, np.sqrt(2)/2), alpha)
+            # wd = ez() * alphadot
+            R_rh_world = Reye()
+            wd = pxyz(0, 0, 0)
 
             # Define left hand trajectory
             p_lh_world = pxyz(0.5, 0.3 - 0.2 * (t-3), -0.1 + 0.5 * (t-3))
@@ -284,52 +286,80 @@ class Trajectory():
             (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
             (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg'))
 
+            
+            # T matrices based on desired positions
+            T_rh_world = T_from_Rp(R_rh_world, p_rh_world)
+            T_lh_world = T_from_Rp(R_lh_world, p_lh_world)
+            T_ll_world = T_from_Rp(Reye(), self.p_ll_world)
+            T_rl_world = T_from_Rp(Reye(), self.p_rl_world)
+
+            # Get desired positions of right hand and left hand w.r.t leg
+            Td_rh_ll = np.linalg.inv(T_ll_world) @ T_rh_world
+            Td_lh_ll = np.linalg.inv(T_ll_world) @ T_lh_world
+            Td_rl_ll = np.linalg.inv(T_ll_world) @ T_rl_world
+            Td_ll_rh = np.linalg.inv(T_rh_world) @ T_ll_world
+
+            pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
+            pd_lh_ll, Rd_lh_ll = p_from_T(Td_lh_ll), R_from_T(Td_lh_ll)
+            pd_rl_ll, Rd_rl_ll = p_from_T(Td_rl_ll), R_from_T(Td_rl_ll)
+            pd_ll_rh, Rd_ll_rh = p_from_T(Td_ll_rh), R_from_T(Td_ll_rh)
+
             # T matrices based on positions from fkin
             T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
             T_rl_pelvis = T_from_Rp(R_rl_pelvis, p_rl_pelvis)
             T_rh_pelvis = T_from_Rp(R_rh_pelvis, p_rh_pelvis)
             T_lh_pelvis = T_from_Rp(R_lh_pelvis, p_lh_pelvis)
 
-            # Get positions of right and left hand w.r.t left leg
+            # Get current positions of right and left hand w.r.t left leg
             T_rh_ll = np.linalg.inv(T_ll_pelvis) @ T_rh_pelvis
             T_lh_ll = np.linalg.inv(T_ll_pelvis) @ T_lh_pelvis
             T_rl_ll = np.linalg.inv(T_ll_pelvis) @ T_rl_pelvis
+            T_ll_rh = np.linalg.inv(T_rh_pelvis) @ T_ll_pelvis
+
             p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
             p_lh_ll, R_lh_ll = p_from_T(T_lh_ll), R_from_T(T_lh_ll)
             p_rl_ll, R_rl_ll = p_from_T(T_rl_ll), R_from_T(T_rl_ll)
+            p_ll_rh, R_ll_rh = p_from_T(T_ll_rh), R_from_T(T_ll_rh)
             
             # Get position of pelvis with respect to world
             T_pelvis_world = T_from_Rp(self.p_ll_world, self.R_ll_world) @ np.linalg.inv(T_ll_pelvis)
-            p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), Reye()     
-            # p_pelvis_world, R_pelvis_world = self.p_ll_world - p_ll_pelvis, Reye()
-
+            # p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), Reye()     
+            p_pelvis_world, R_pelvis_world = self.p_ll_world - p_ll_pelvis, Reye()
 
             # Stacking Jacobians
             J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
                                 np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
         
-            e_rh_ll = np.vstack((ep(self.p_ll_world - p_rh_world, p_rh_ll), eR(R_rh_world, R_rh_ll)))
+            e_rh_ll = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
 
             J_lh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_lh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_lh_pelvis)]])),
                                 np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_lh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_lh_pelvis)]]))))
             
-            e_lh_ll = np.vstack((ep(self.p_ll_world - p_lh_world, p_lh_ll), eR(R_lh_world, R_lh_ll)))
+            e_lh_ll = np.vstack((ep(pd_lh_ll, p_lh_ll), eR(Rd_lh_ll, R_lh_ll)))
 
             J_rl_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rl_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rl_pelvis)]])),
                                 np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rl_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rl_pelvis)]]))))
 
-            e_rl_ll = np.vstack((ep(self.p_ll_world - self.p_rl_world, p_rl_ll), eR(Reye(), R_rl_ll)))
+            e_rl_ll = np.vstack((ep(pd_rl_ll, p_rl_ll), eR(Rd_rl_ll, R_rl_ll)))
 
-            v = np.zeros((18, 1))
+            J_ll_rh = np.vstack((np.transpose(R_rh_pelvis) @ (np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]]) - np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]])),
+                                np.transpose(R_rh_pelvis) @ (np.block([[Jw_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]]) - np.block([[np.zeros_like(Jw_ll_pelvis), Jv_rh_pelvis]]))))
+                                
+            e_ll_rh = np.vstack((ep(pd_ll_rh, p_ll_rh), eR(Rd_ll_rh, R_ll_rh)))
+
+
+            v = np.zeros((24, 1))
             v[6:9] = v_rh_world
             v[9:12] = wd
             v[12:15] = v_lh_world
+            v[18:21] = -v_rh_world
+            v[21:24] = -wd
             # v = np.zeros((12, 1))
             # v[:3] = v_rh_world
             # v[3:6] = wd
             # v[6:9] = v_lh_world
 
-            e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
+            e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll, e_ll_rh))
             # e = np.vstack((e_rl_ll, e_rh_ll))
             # e = np.vstack((e_rh_ll, e_lh_ll))
             
@@ -337,10 +367,11 @@ class Trajectory():
             J = np.block([
                 [J_rl_ll, np.zeros((6,30))],
                 [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
-                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))]
+                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
+                [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))],
             ])
 
-            J[:,0:6] = 0
+            # J[:,0:6] = 0
 
             gamma = 0.1
             Jinv_W = np.linalg.inv(self.M @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M @ np.transpose(J)
