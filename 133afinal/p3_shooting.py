@@ -194,9 +194,9 @@ class Trajectory():
         self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = -1.559, -1.559
         
         # Set up initial positions for the chain tips
-        self.p_ll_world, self.R_ll_world = (np.array([-0.040202, 0.13801, -0.80109]).reshape((-1, 1)), R_from_quat(np.array([0.00024573, 0.0058819, 4.6204e-06, 0.99998])))
-        self.p_rl_world, self.R_rl_world = (np.array([-0.040196, -0.13764, -0.80111]).reshape((-1, 1)), R_from_quat(np.array([5.9372e-05, 0.0058819, 7.288e-05, 0.99998])))
-        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0]).reshape((-1, 1)), Reye())
+        self.p_ll_world, self.R_ll_world = (np.array([-0.040202, -0.13801, 0.00002]).reshape((-1, 1)), R_from_quat(np.array([0.00024573, 0.0058819, 4.6204e-06, 0.99998])))
+        self.p_rl_world, self.R_rl_world = (np.array([-0.040196, 0.13764, 0.0]).reshape((-1, 1)), R_from_quat(np.array([5.9372e-05, 0.0058819, 7.288e-05, 0.99998])))
+        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.80111]).reshape((-1, 1)), R_from_quat(np.array([0, 0, 0, 1])))
 
         # Weighted matrix
         weights = np.ones(42)
@@ -256,7 +256,7 @@ class Trajectory():
             # alpha, alphadot = 0.9 * (t-3), 0.9
             # R_rh_world = Rote(pxyz(0, np.sqrt(2)/2, np.sqrt(2)/2), alpha)
             # wd = ez() * alphadot
-            p_rh_world = pxyz(0.014083, -0.60298, 0.63143)
+            p_rh_world = pxyz(0.014083, -0.60298, 0.63143+0.80111)
             v_rh_world = pxyz(0, 0, 0)
             R_rh_world = R_from_quat(np.array([-0.69191, -0.14921, 0.15891, 0.68829]))
             wd = pxyz(0, 0, 0)
@@ -265,7 +265,7 @@ class Trajectory():
             # p_lh_world = pxyz(0.4, 0.15 - 0.1 * (t-3), -0.1  + 0.4 * (t-3))
             # v_lh_world = pxyz(0, -0.1, 0.4)
             # R_lh_world = Reye()
-            p_lh_world = pxyz(0.014042, 0.60303, 0.63137)
+            p_lh_world = pxyz(0.014042, 0.60303, 0.63137+0.80111)
             v_lh_world = pxyz(0, 0, 0)
             R_lh_world = R_from_quat(np.array([0.69199, -0.14915, -0.15855, 0.6883]))
 
@@ -293,8 +293,6 @@ class Trajectory():
             pd_rl_ll, Rd_rl_ll = p_from_T(Td_rl_ll), R_from_T(Td_rl_ll)
             pd_ll_rh, Rd_ll_rh = p_from_T(Td_ll_rh), R_from_T(Td_ll_rh)
 
-            print(pd_rh_ll, pd_lh_ll)
-
             # T matrices based on positions from fkin
             T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
             T_rl_pelvis = T_from_Rp(R_rl_pelvis, p_rl_pelvis)
@@ -311,6 +309,9 @@ class Trajectory():
             p_lh_ll, R_lh_ll = p_from_T(T_lh_ll), R_from_T(T_lh_ll)
             p_rl_ll, R_rl_ll = p_from_T(T_rl_ll), R_from_T(T_rl_ll)
             p_ll_rh, R_ll_rh = p_from_T(T_ll_rh), R_from_T(T_ll_rh)
+
+            # print(p_rl_ll, R_rl_ll)
+            # print("---------")
             
             # Get new position of pelvis with respect to world
             T_pelvis_world = T_ll_world @ np.linalg.inv(T_ll_pelvis)
@@ -338,16 +339,16 @@ class Trajectory():
             e_ll_rh = np.vstack((ep(pd_ll_rh, p_ll_rh), eR(Rd_ll_rh, R_ll_rh)))
 
 
-            v = np.zeros((18, 1))
-            v[6:9] = v_rh_world
-            v[12:15] = v_lh_world
+            v = np.zeros((6, 1))
+            # v[6:9] = v_rh_world
+            # v[12:15] = v_lh_world
 
-            e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
+            e = np.vstack((e_rl_ll))
             
             J = np.block([
                 [J_rl_ll, np.zeros((6,30))],
-                [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
-                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
+                # [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
+                # [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
                 # [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))]
             ])
 
