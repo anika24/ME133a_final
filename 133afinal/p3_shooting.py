@@ -286,7 +286,6 @@ class Trajectory():
             (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
             (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg'))
 
-            
             # T matrices based on desired positions
             T_rh_world = T_from_Rp(R_rh_world, p_rh_world)
             T_lh_world = T_from_Rp(R_lh_world, p_lh_world)
@@ -322,8 +321,8 @@ class Trajectory():
             p_ll_rh, R_ll_rh = p_from_T(T_ll_rh), R_from_T(T_ll_rh)
             
             # Get position of pelvis with respect to world
-            T_pelvis_world = T_from_Rp(self.p_ll_world, self.R_ll_world) @ np.linalg.inv(T_ll_pelvis)
-            # p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), Reye()     
+            T_pelvis_world = T_ll_world @ np.linalg.inv(T_ll_pelvis)
+            # p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), R_from_T(T_pelvis_world)
             p_pelvis_world, R_pelvis_world = self.p_ll_world - p_ll_pelvis, Reye()
 
             # Stacking Jacobians
