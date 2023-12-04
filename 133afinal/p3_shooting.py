@@ -140,16 +140,6 @@ class GeneratorNode(Node):
             return
         (q, qdot) = desired
 
-        # p_ll = pxyz(-0.010126, 0.1377, -1.0834)
-        # R_ll = Reye()
-        # Tll = T_from_Rp(R_ll, p_ll)
-        # trans = TransformStamped()
-        # trans.header.stamp    = self.now().to_msg()
-        # trans.header.frame_id = 'world'
-        # trans.child_frame_id  = 'leftFoot'
-        # trans.transform       = Transform_from_T(Tll)
-        # self.broadcaster.sendTransform(trans)
-
         # Check the results.
         if not (isinstance(q, list) and isinstance(qdot, list)):
             self.get_logger().warn("(q) and (qdot) must be python lists!")
@@ -187,16 +177,19 @@ class Trajectory():
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
         self.q[joints.index('torsoPitch')] = 0.343
-        self.q[joints.index('leftShoulderPitch')], self.q[joints.index('rightShoulderPitch')] = -0.438, -0.438
-        self.q[joints.index('leftShoulderRoll')], self.q[joints.index('rightShoulderRoll')] = -1.5, 1.5
+        self.q[joints.index('leftShoulderPitch')], self.q[joints.index('rightShoulderPitch')] = -0.85, -0.85
+        self.q[joints.index('leftShoulderRoll')], self.q[joints.index('rightShoulderRoll')] = -1.233, 1.233
         self.q[joints.index('rightHipYaw')], self.q[joints.index('leftHipYaw')] = -0.2, 0.2
+        self.q[joints.index('leftWristRoll')], self.q[joints.index('rightWristRoll')] = 0.3, -0.3
+        self.q[joints.index('leftWristPitch')], self.q[joints.index('rightWristPitch')] = -0.3, 0.3
+
 
         self.q[joints.index('leftKneePitch')], self.q[joints.index('rightKneePitch')] = 1.664, 1.664
         self.q[joints.index('leftAnklePitch')], self.q[joints.index('rightAnklePitch')] = -0.913, -0.913
         self.q[joints.index('leftHipPitch')], self.q[joints.index('rightHipPitch')] = -0.739, -0.739
-        self.q[joints.index('leftForearmYaw')], self.q[joints.index('rightForearmYaw')] = 1.132, 1.132
-        self.q[joints.index('leftElbowPitch')], self.q[joints.index('rightElbowPitch')] = -1.579, 1.579
-        self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = 0.4, 0.4
+        self.q[joints.index('leftForearmYaw')], self.q[joints.index('rightForearmYaw')] = 0.463, 0.463
+        self.q[joints.index('leftElbowPitch')], self.q[joints.index('rightElbowPitch')] = -0.785, 0.785
+        self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = 0.8, 0.8
         
         # Set up initial positions for the chain tips
         # self.p_ll_world, self.R_ll_world = (np.array([-0.010126, 0.1377, -0.28232]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
@@ -206,14 +199,28 @@ class Trajectory():
         self.p_rl_world, self.R_rl_world = (np.array([-0.046633, -0.12899, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.99499, 0.000599, 0.00597, -0.099832])))
         self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.80111]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
 
-
         # Weighted matrix
         weights = np.ones(42)
         W = np.diag(weights)
         self.M = np.linalg.inv(W @ W)
-        
+
+        # Goal vector for secondary task: Keep joints centered
+        self.qgoal = np.zeros((len(joints), 1))
+        self.qgoal[joints.index('leftShoulderPitch')], self.qgoal[joints.index('rightShoulderPitch')] = -0.85, -0.85
+        self.qgoal[joints.index('leftShoulderRoll')], self.qgoal[joints.index('rightShoulderRoll')] = -1.233, 1.233
+        self.qgoal[joints.index('rightHipYaw')], self.qgoal[joints.index('leftHipYaw')] = -0.2, 0.2
+        self.qgoal[joints.index('leftWristRoll')], self.qgoal[joints.index('rightWristRoll')] = 0.3, -0.3
+        self.qgoal[joints.index('leftWristPitch')], self.qgoal[joints.index('rightWristPitch')] = -0.3, 0.3
+        self.qgoal[joints.index('leftKneePitch')], self.qgoal[joints.index('rightKneePitch')] = 1.664, 1.664
+        self.qgoal[joints.index('leftAnklePitch')], self.qgoal[joints.index('rightAnklePitch')] = -0.913, -0.913
+        self.qgoal[joints.index('leftHipPitch')], self.qgoal[joints.index('rightHipPitch')] = -0.739, -0.739
+        self.qgoal[joints.index('leftForearmYaw')], self.qgoal[joints.index('rightForearmYaw')] = 0.463, 0.463
+        self.qgoal[joints.index('leftElbowPitch')], self.qgoal[joints.index('rightElbowPitch')] = -0.785, 0.785
+        self.qgoal[joints.index('leftShoulderYaw')], self.qgoal[joints.index('rightShoulderYaw')] = 0.8, 0.8
+
         # Other constants
         self.lam = 20
+        self.lam_s = 30
 
     def get_some_q(self, q, chain):
         curr_joints = joint_names[chain]
@@ -229,7 +236,7 @@ class Trajectory():
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # Compute the joints.
-        if t <= 3 or t >= 5:
+        if t <= 3 or t >= 4:
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
 
             broadcast = self.node.broadcaster
@@ -245,7 +252,7 @@ class Trajectory():
             return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
         
         # Desired trajectory of right palm with respect to both legs:
-        elif 3 < t < 5:
+        elif 3 < t < 4:
             # Broadcasting pelvis and left foot
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
             broadcast = self.node.broadcaster
@@ -258,26 +265,14 @@ class Trajectory():
             trans.transform       = Transform_from_T(Tpelvis)
             broadcast.sendTransform(trans)
 
-            # Define right hand trajectory
-            # p_rh_world = pxyz(0.3, -0.1 * (t-3), -0.1 + 0.5 * (t-3))
-            # v_rh_world = pxyz(0, -0.1, 0.5)
-            # alpha, alphadot = 0.9 * (t-3), 0.9
-            # R_rh_world = Rote(pxyz(0, np.sqrt(2)/2, np.sqrt(2)/2), alpha)
-            # wd = ez() * alphadot
-
-            p_rh_world = pxyz(0.44027, -0.15341, 0.78005)
-            v_rh_world = pxyz(0, 0, 0)
-            R_rh_world = R_from_quat(np.array([0.53943, 0.121, -0.12045, 0.82454]))
+            p_rh_world = pxyz(0.52418, -0.29014, 0.68481 + 1.0 * (t-3))
+            v_rh_world = pxyz(0, 0, 1.0)
+            R_rh_world = R_from_quat(np.array([0.53377, 0.20983, -0.064726, 0.81662]))
             wd = pxyz(0, 0, 0)
 
-            # Define left hand trajectory
-            # p_lh_world = pxyz(0.4, 0.15 - 0.1 * (t-3), -0.1  + 0.4 * (t-3))
-            # v_lh_world = pxyz(0, -0.1, 0.4)
-            # R_lh_world = Reye()
-
-            p_lh_world = pxyz(0.44027, 0.15341, 0.78005)
-            v_lh_world = pxyz(0, 0, 0)
-            R_lh_world = R_from_quat(np.array([ 0.53943, -0.121, -0.12045, -0.82454]))
+            p_lh_world = pxyz(0.52418, 0.29014 - 0.2 * (t-3), 0.68481 + 0.8 * (t-3))
+            v_lh_world = pxyz(0, -0.2, 0.8)
+            R_lh_world = R_from_quat(np.array([0.53377, -0.20983, -0.064726, -0.81662]))
             
             # Fkin
             qlast = self.q
@@ -347,17 +342,23 @@ class Trajectory():
 
 
             v = np.zeros((18, 1))
+            v[6:9] = (np.transpose(self.R_ll_world) @ v_rh_world)
+            v[12:15] = np.transpose(self.R_ll_world) @ v_lh_world
+            # v[18:21] = -v[6:9]
             e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
             
             J = np.block([
                 [J_rl_ll, np.zeros((6,30))],
                 [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
                 [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
+                # [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))],
             ])
 
             gamma = 0.1
+            qdot_s = self.lam_s * (self.qgoal - qlast)
             Jinv_W = np.linalg.inv(self.M @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M @ np.transpose(J)
-            qdot = np.linalg.pinv(J) @ (v + self.lam * e)
+            qdot = Jinv_W @ (v + self.lam * e) + (np.eye(42) - Jinv_W @ J) @ qdot_s
+            # qdot = Jinv_W @ (v + self.lam * e)
             q = qlast + dt * qdot
             self.q = q
             self.qdot = qdot
