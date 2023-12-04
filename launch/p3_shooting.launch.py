@@ -81,6 +81,5 @@ def generate_launch_description():
         # Start the robot_state_publisher, RVIZ, the GUI, and the demo.
         node_robot_state_publisher,
         node_rviz,
-        # node_gui,
         node_p3_shooting,
     ])
