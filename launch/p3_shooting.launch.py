@@ -29,6 +29,7 @@ def generate_launch_description():
 
     # Locate the RVIZ configuration file.
     rvizcfg = os.path.join(pkgdir('hw3code'), 'rviz/viewurdf.rviz')
+    #rvizcfg2 = os.path.join(pkgdir('demos'), 'rviz/viewmarkers.rviz')
 
     # Locate the URDF file.
     urdf = os.path.join(pkgdir('133afinal'), 'urdf/val_valkyrie_D.urdf')

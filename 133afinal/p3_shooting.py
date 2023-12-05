@@ -29,6 +29,12 @@ from hw5code.TrajectoryUtils    import *
 # Grab the general fkin from HW5 P5.
 from hw5code.KinematicChain     import KinematicChain
 
+# For Building Visualizations
+from rclpy.qos                  import QoSProfile, DurabilityPolicy
+from geometry_msgs.msg          import Point, Vector3, Quaternion
+from std_msgs.msg               import ColorRGBA
+from visualization_msgs.msg     import Marker
+from visualization_msgs.msg     import MarkerArray
 
 joint_names = {
     'left_leg': ['leftHipYaw', 'leftHipRoll', 'leftHipPitch', 'leftKneePitch', 
@@ -51,6 +57,60 @@ joint_names = {
                 
     'neck': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'lowerNeckPitch', 'neckYaw', 'upperNeckPitch']
 }
+
+#
+#   Create the marker array to visualize.
+#
+def post(x, y, diameter, height):
+    # Create the cyclinder marker.
+    marker = Marker()
+    marker.type             = Marker.CYLINDER
+    marker.pose.orientation = Quaternion()
+    marker.pose.position    = Point(x = x-4, y = y-4, z = height/2)
+    marker.scale            = Vector3(x = diameter, y = diameter, z = height)
+    marker.color            = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+    return marker
+
+def line(x, y, z, lx, ly, lz, cr, cg, cb, ca):
+    # Create the cube marker.
+    marker = Marker()
+    marker.type             = Marker.CUBE
+    marker.pose.orientation = Quaternion()
+    marker.pose.position    = Point(x = x-4, y = y-4, z = z)
+    marker.scale            = Vector3(x = lx, y = ly, z = lz)
+    marker.color            = ColorRGBA(r=cr, g=cg, b=cb, a=ca)
+    return marker
+
+def building_hoop():
+    # Start with an empty marker list.
+    markers = []
+
+    # Building the pole of the hoop
+    markers.append(post(1.0,  1.0, 0.1, 3.0))
+
+    # Building the backboard of the hoop
+    markers.append(line(1.0, 1.0, 3.0, 1.4, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0))
+
+    # Build the Shooting box on the backboard
+    markers.append(line(1.35, 1.05, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65, 1.05, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0, 1.05, 3.1-0.05, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+
+    # Build the Edge of the Backboard
+    markers.append(line(1.0, 1.05, 2.55, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0, 1.05, 3.45, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    
+    markers.append(line(0.35, 1.05, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.65, 1.05, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+
+    # Building the rim of the hoop
+    markers.append(line(1.35, 1.4, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65, 1.4, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0, 1.05, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0, 1.75, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+
+    # Return the list of markers
+    return markers
 
 #
 #   Trajectory Generator Node Class
@@ -99,6 +159,40 @@ class GeneratorNode(Node):
         self.timer = self.create_timer(self.dt, self.update)
         self.get_logger().info("Running with dt of %f seconds (%fHz)" %
                                (self.dt, rate))
+
+
+
+
+
+        # Prepare the publisher (latching for new subscribers).
+        quality = QoSProfile(durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                             depth=1)
+        self.pub2 = self.create_publisher(
+            MarkerArray, '/visualization_marker_array', quality)
+
+        # Wait for a connection to happen, so only have to send once.
+        self.get_logger().info("Waiting for RVIZ...")
+        #while(not self.count_subscribers('/visualization_marker_array')):
+        #    pass
+        self.get_logger().info("Got Passed . . . ")
+
+        # Create the markers visualize.
+        self.markers = building_hoop()
+
+        # Add the timestamp, frame, namespace, action, and id to each marker.
+        timestamp = self.get_clock().now().to_msg()
+        for (i,marker) in enumerate(self.markers):
+            marker.header.stamp       = timestamp
+            marker.header.frame_id    = 'world'
+            marker.ns                 = 'hoop'
+            marker.action             = Marker.ADD
+            marker.id                 = i
+        
+        # Create the marker array message and publish.
+        arraymsg = MarkerArray()
+        arraymsg.markers = self.markers
+        self.pub2.publish(arraymsg)
+
 
     # Shutdown
     def shutdown(self):
@@ -161,6 +255,20 @@ class GeneratorNode(Node):
         cmdmsg.position     = q                 # List of joint positions
         cmdmsg.velocity     = qdot              # List of joint velocities
         self.pub.publish(cmdmsg)
+
+        now = self.start + Duration(seconds=self.t)
+        for (i,marker) in enumerate(self.markers):
+            marker.header.stamp       = now.to_msg()
+            marker.header.frame_id    = 'world'
+            marker.ns                 = 'hoop'
+            marker.action             = Marker.ADD
+            marker.id                 = i
+        
+        # Create the marker array message and publish.
+        arraymsg = MarkerArray()
+        arraymsg.markers = self.markers
+        self.pub2.publish(arraymsg)
+
 
 class Trajectory():
     # Initialization.
@@ -346,11 +454,11 @@ class Trajectory():
             # v[0:3] = (np.transpose(self.R_ll_world) @ v_rh_world)
             # v[12:15] = np.transpose(self.R_ll_world) @ v_lh_world
             # v[18:21] = R_ll_rh @ (-v[6:9])
-            e = np.vstack((e_rl_ll))
+            e = np.vstack((e_rh_ll))
 
             J = np.block([
-                [J_rl_ll, np.zeros((6,30))],
-                # [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
+                # [J_rl_ll, np.zeros((6,30))],
+                [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
                 # [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
                 # [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))]
             ])
