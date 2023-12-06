@@ -319,20 +319,6 @@ class Trajectory():
         # Initial q
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
-        # self.q[joints.index('torsoYaw')], self.q[joints.index('torsoPitch')], self.q[joints.index('torsoRoll')] = -0.1, 0.1, 0
-        # self.q[joints.index('lowerNeckPitch')], self.q[joints.index('neckYaw')], self.q[joints.index('upperNeckPitch')] = 0, 0, 0
-        # self.q[joints.index('rightShoulderPitch')], self.q[joints.index('rightShoulderRoll')], self.q[joints.index('rightShoulderYaw')] = -0.543, 1.519, 0.2
-        # self.q[joints.index('rightElbowPitch')] = 0.810
-        # self.q[joints.index('rightForearmYaw')] = 0.965
-        # self.q[joints.index('rightWristRoll')],  self.q[joints.index('rightWristPitch')],  self.q[joints.index('rightThumbRoll')] = -0.389, 0.231, 1.350
-        # self.q[joints.index('leftShoulderPitch')], self.q[joints.index('leftShoulderRoll')], self.q[joints.index('leftShoulderYaw')] = -0.543, -1.549, 0.710
-        # self.q[joints.index('leftElbowPitch')] = -0.847
-        # self.q[joints.index('leftForearmYaw')] = 1.216
-        # self.q[joints.index('leftWristRoll')],  self.q[joints.index('leftWristPitch')],  self.q[joints.index('leftThumbRoll')] = 0.235, -0.309, 0.675
-        # self.q[joints.index('rightHipYaw')], self.q[joints.index('rightHipRoll')], self.q[joints.index('rightHipPitch')] = -0.40, 0, -0.935
-        # self.q[joints.index('rightKneePitch')], self.q[joints.index('rightAnklePitch')], self.q[joints.index('rightAnkleRoll')] = 1.467, -0.452, 0
-        # self.q[joints.index('leftHipYaw')], self.q[joints.index('leftHipRoll')], self.q[joints.index('leftHipPitch')] = -0.169, 0, -0.935
-        # self.q[joints.index('leftKneePitch')], self.q[joints.index('leftAnklePitch')], self.q[joints.index('leftAnkleRoll')] = 1.467, -0.452, 0
         self.q[joints.index('torsoPitch')] = 0.343
         self.q[joints.index('leftShoulderPitch')], self.q[joints.index('rightShoulderPitch')] = -0.438, -0.438
         self.q[joints.index('leftShoulderRoll')], self.q[joints.index('rightShoulderRoll')] = -1.5, 1.5
@@ -346,9 +332,6 @@ class Trajectory():
 
         
         # Set up initial positions for the chain tips
-        # self.p_ll_world, self.R_ll_world = (np.array([0.1361, 0.115, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.99563, 0.0033751, 0.039847, -0.084332])))
-        # self.p_rl_world, self.R_rl_world = (np.array([0.10744, -0.18622, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.97928, 0.0079447, 0.039192, -0.19851])))
-        # self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.84695]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
         self.y_offset = 1
         self.p_ll_world, self.R_ll_world = (np.array([0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.77415, 0.0037979, 0.004645, -0.63297])))
         self.p_rl_world, self.R_rl_world = (np.array([-0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.63297, 0.004645, 0.0037979, -0.77415])))
@@ -356,14 +339,16 @@ class Trajectory():
 
         # Weighted matrix
         weights = np.ones(42)
-        weights[14] = 10
+        # weights[joints.index('rightKneePitch')] = 1.0
+        # weights[joints.index('leftKneePitch')] = 1.0
         W = np.diag(weights)
         self.M = np.linalg.inv(W @ W)
 
         # Goal vector for secondary task: Keep joints near beginning position
-        # self.qgoal = np.zeros((len(joints), 1))
-        q0 = self.q.copy()
-        self.qgoal = q0
+        self.qgoal = np.zeros((len(joints), 1))
+        self.qgoal[joints.index('torsoPitch')] = 0
+        self.qgoal[joints.index('torsoRoll')] = 0
+        self.qgoal[joints.index('torsoYaw')] = 0
 
         # Other constants
         self.lam = 20
@@ -414,17 +399,17 @@ class Trajectory():
             broadcast.sendTransform(trans)
 
             # Trajectory of right hand and left hand
-            # p_lh_world = pxyz(0.4374, 0.072564 - 0.1 * (t-3), 0.75006 + 0.3 * (t-3))
-            # R_lh_world = R_from_quat(np.array([-0.31281, 0.053035, -0.046646, 0.94718]))
-            p_lh_world = pxyz(0.15341 - 0.2 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.2 * (t-3))
+            p_lh_world = pxyz(0.15341 - 0.05 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.2 * (t-3))
             R_lh_world = R_from_quat(np.array([0.2016, 0.17074, -0.00038883, 0.96447]))
-            v_lh_world = pxyz(-0.2, 0, 1.2)
-
-            # p_rh_world = pxyz(0.44239, -0.28093 - 0.1 * (t-3), 0.76293 + 0.4 * (t-3))
-            # R_rh_world = R_from_quat(np.array([0.66249, 0.11349, -0.18655, 0.71654]))
-            p_rh_world = pxyz(-0.15341 - 0.15 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.3 * (t-3))
+            v_lh_world = pxyz(-0.05, 0, 1.2)
+            w_lh_world = pxyz(0, 0, 0)
+            
+            p_rh_world = pxyz(-0.15341 - 0.05 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.3 * (t-3))
             R_rh_world = R_from_quat(np.array([0.96447, 0.00038883, -0.17074, 0.2016]))
-            v_rh_world = pxyz(-0.15, 0, 1.3)
+            v_rh_world = pxyz(-0.05, 0, 1.3)
+            alpha, alphadot = 1.0 * (t-3), 1.0
+            R_rh_world = Roty(alpha)
+            w_rh_world = ey() * alphadot
             
             # Fkin
             qlast = self.q
@@ -490,7 +475,9 @@ class Trajectory():
 
             v = np.zeros((18, 1))
             v[6:9] = np.transpose(self.R_ll_world) @ v_rh_world
-            v[9:12] = np.transpose(self.R_ll_world) @ v_lh_world
+            v[9:12] = np.transpose(self.R_ll_world) @ w_rh_world
+            v[12:15] = np.transpose(self.R_ll_world) @ v_lh_world
+            v[15:18] = np.transpose(self.R_ll_world) @ w_lh_world
             e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
 
             J = np.block([
@@ -500,10 +487,15 @@ class Trajectory():
             ])
 
             gamma = 0.15
+            qlast_modified = np.zeros((42, 1))
+            qlast_modified[12:15] = qlast[12:15]
+            qdot_s = self.lam_s * (self.qgoal - qlast_modified)
             Jinv_W = np.linalg.inv(self.M @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M @ np.transpose(J)
-            # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(42) - Jinv_W @ J) @ qdot_s
-            qdot = Jinv_W @ (v + self.lam * e)
+            qdot = Jinv_W @ (v + self.lam * e) + (np.eye(42) - Jinv_W @ J) @ qdot_s
+            # qdot = Jinv_W @ (v + self.lam * e)
             q = qlast + dt * qdot
+            # print(q[12:15])
+            # print(q[self.jointnames().index('rightForearmYaw')])
             self.q = q
             self.qdot = qdot
             self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
