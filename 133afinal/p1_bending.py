@@ -38,13 +38,15 @@ joint_names = {
                 'rightAnkleRoll'],
 
     'left_arm': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'leftShoulderPitch', 'leftShoulderRoll',
-                'leftShoulderYaw', 'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch', 
-                'leftThumbRoll', 'leftThumbPitch1', 'leftIndexFingerPitch1', 'leftMiddleFingerPitch1',
+                'leftShoulderYaw', 'leftElbowPitch', 'leftForearmYaw', 'leftWristRoll', 'leftWristPitch'],
+
+    'left_hand': ['leftThumbRoll', 'leftThumbPitch1', 'leftIndexFingerPitch1', 'leftMiddleFingerPitch1',
                 'leftPinkyPitch1'],
 
     'right_arm': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'rightShoulderPitch', 'rightShoulderRoll',
-                'rightShoulderYaw', 'rightElbowPitch', 'rightForearmYaw', 'rightWristRoll', 'rightWristPitch', 
-                'rightThumbRoll', 'rightThumbPitch1', 'rightIndexFingerPitch1', 'rightMiddleFingerPitch1',
+                'rightShoulderYaw', 'rightElbowPitch', 'rightForearmYaw', 'rightWristRoll', 'rightWristPitch'],
+
+    'right_hand': ['rightThumbRoll', 'rightThumbPitch1', 'rightIndexFingerPitch1', 'rightMiddleFingerPitch1',
                 'rightPinkyPitch1'],
                 
     'neck': ['torsoYaw', 'torsoPitch', 'torsoRoll', 'lowerNeckPitch', 'neckYaw', 'upperNeckPitch']
@@ -138,17 +140,15 @@ class GeneratorNode(Node):
             return
         (q, qdot) = desired
 
-        ppelvis = pxyz(0.0, 0, -0.3 * abs(np.sin(self.t/2)))
-        # Rpelvis = Rotz(np.sin(self.t))
-        Rpelvis = Reye()
-        Tpelvis = T_from_Rp(Rpelvis, ppelvis)
+        # ppelvis = pxyz(0.0, 0, -0.3 * abs(np.sin(self.t/2)))
+        # Rpelvis = Reye()
+        # Tpelvis = T_from_Rp(Rpelvis, ppelvis)
         
-        trans = TransformStamped()
-        trans.header.stamp    = self.now().to_msg()
-        trans.header.frame_id = 'world'
-        trans.child_frame_id  = 'pelvis'
-        trans.transform       = Transform_from_T(Tpelvis)
-        self.broadcaster.sendTransform(trans)
+        # trans = TransformStamped()
+        # trans.header.stamp    = self.now().to_msg()
+        # trans.header.frame_id = 'pelvis'
+        # trans.child_frame_id  = 'pelvis'
+        # self.broadcaster.sendTransform(trans)
 
         # Check the results.
         if not (isinstance(q, list) and isinstance(qdot, list)):
@@ -176,89 +176,128 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         #   Set up the kinematic chain object.
+        joints = self.jointnames()
+        self.node = node
         self.chain_left_leg = KinematicChain(node, 'pelvis', 'leftFoot', joint_names['left_leg'])
-        self.chain_right_leg = KinematicChain(node, 'pelvis', 'rightFoot', joint_names['right_leg'])
+        self.chain_right_arm = KinematicChain(node, 'pelvis', 'rightPalm', joint_names['right_arm'])
 
-        # Initial q0 is 0
-        self.q_left_leg = np.zeros((6, 1))
-        self.q_right_leg = np.zeros((6, 1))
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
-        self.q[0], self.q[6] = 0.2, 0.2
-        self.q[3], self.q[9] = 0.1, 0.1
+        self.q[joints.index('torsoYaw')], self.q[joints.index('torsoPitch')], self.q[joints.index('torsoRoll')] = -0.1, 0.1, 0
+        self.q[joints.index('lowerNeckPitch')], self.q[joints.index('neckYaw')], self.q[joints.index('upperNeckPitch')] = 0, 0, 0
+        self.q[joints.index('rightShoulderPitch')], self.q[joints.index('rightShoulderRoll')], self.q[joints.index('rightShoulderYaw')] = -0.543, 1.519, 0.2
+        self.q[joints.index('rightElbowPitch')] = 0.810
+        self.q[joints.index('rightForearmYaw')] = 0.965
+        self.q[joints.index('rightWristRoll')],  self.q[joints.index('rightWristPitch')],  self.q[joints.index('rightThumbRoll')] = -0.389, 0.231, 1.350
+        self.q[joints.index('leftShoulderPitch')], self.q[joints.index('leftShoulderRoll')], self.q[joints.index('leftShoulderYaw')] = -0.543, -1.549, 0.710
+        self.q[joints.index('leftElbowPitch')] = -0.847
+        self.q[joints.index('leftForearmYaw')] = 1.216
+        self.q[joints.index('leftWristRoll')],  self.q[joints.index('leftWristPitch')],  self.q[joints.index('leftThumbRoll')] = 0.235, -0.309, 0.675
+        self.q[joints.index('rightHipYaw')], self.q[joints.index('rightHipRoll')], self.q[joints.index('rightHipPitch')] = -0.40, 0, -0.935
+        self.q[joints.index('rightKneePitch')], self.q[joints.index('rightAnklePitch')], self.q[joints.index('rightAnkleRoll')] = 1.467, -0.452, 0
+        self.q[joints.index('leftHipYaw')], self.q[joints.index('leftHipRoll')], self.q[joints.index('leftHipPitch')] = -0.169, 0, -0.935
+        self.q[joints.index('leftKneePitch')], self.q[joints.index('leftAnklePitch')], self.q[joints.index('leftAnkleRoll')] = 1.467, -0.452, 0
 
-        # Set up initial positions for the chain tips, with respect to the pelvis
-        self.pos_left_leg = (np.array([0.010126, 0.1377, -1.0834]).reshape((-1, 1)), Reye())
-        self.pos_right_leg = (np.array([0.010126, -0.1377, -1.0834]).reshape((-1, 1)), Reye())
+        self.p_ll_pelvis, self.R_ll_pelvis = (np.array([0.1361, 0.115, -0.84695]).reshape((-1, 1)), R_from_quat(np.array([0.99563, 0.0033751, 0.039847, -0.084332])))
+        self.p0_rh_ll = np.array([0.30637078, -0.33878031, 0.78993693]).reshape(-1, 1)
 
-        self.qgoal = np.zeros((12, 1))
-        self.qgoal[0], self.qgoal[6] = 0.2, 0.2
-        self.qgoal[3], self.qgoal[9] = 0.1, 0.1
+        self.lam = 1
 
-        self.amp = 0.5
-        self.period = 0.5
-        self.lam = 20
+    def get_some_q(self, q, chain):
+        curr_joints = joint_names[chain]
+        all_joints = self.jointnames()
+        indices = [all_joints.index(x) for x in curr_joints]
+        return q[indices]
 
     # Declare the joint names.
     def jointnames(self):
         # Return a list of joint names FOR THE EXPECTED URDF!
-        return joint_names['left_leg'] + joint_names['right_leg'] + joint_names['neck'] + joint_names['left_arm'][3:] + joint_names['right_arm'][3:]
+        return joint_names['left_leg'] + joint_names['right_leg'] + joint_names['neck'] + joint_names['left_arm'][3:] + joint_names['left_hand'] + joint_names['right_arm'][3:] + joint_names['right_hand']
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        # if 0 < t < 2*pi:
-
-            # Compute the joints.
-            left_leg_qlast = self.q_left_leg
-            right_leg_qlast = self.q_right_leg
-            qlast = self.q[:12]
-
-            # pelvis w/ respect to world
-            ppelvis = pxyz(0.0, 0.0, -0.3 * abs(np.sin(t/2)))
-            Rpelvis = Reye()
-
-            # left and right leg w/ respect to pelvis
-            (pleftleg, Rleftleg, Jllpelvis_v, Jllpelvis_w) = self.chain_left_leg.fkin(left_leg_qlast)
-            (prightleg, Rrightleg, Jrlpelvis_v, Jrlpelvis_w) = self.chain_left_leg.fkin(right_leg_qlast)
-
-            Tpelvis_world = T_from_Rp(Rpelvis, ppelvis)
-            Tleftleg_pelvis = T_from_Rp(Rleftleg, pleftleg)
-            Trightleg_pelvis = T_from_Rp(Rrightleg, prightleg)
-
-            # left and right leg w/ respect to world
-            Tleftleg_world = Tpelvis_world @ Tleftleg_pelvis
-            Trightleg_world = Tpelvis_world @ Trightleg_pelvis
-            pleftleg_world, Rleftleg_world = p_from_T(Tleftleg_world), R_from_T(Tleftleg_world)
-            prightleg_world, Rrightleg_world = p_from_T(Trightleg_world), R_from_T(Trightleg_world)
-            # print(f'left {pleftleg_world} \n right {prightleg_world} \n')
-            # pleftleg_world = ppelvis + pleftleg
-            # prightleg_world = ppelvis + prightleg
-
-            ep_ll, er_ll = ep(self.pos_left_leg[0], pleftleg_world), eR(self.pos_left_leg[1], Rleftleg_world)
-            ep_rl, er_rl = ep(self.pos_right_leg[0], prightleg_world), eR(self.pos_right_leg[1], Rrightleg_world)
-
-            J_ll = np.vstack((Jllpelvis_v, Jllpelvis_w))
-            J_rl = np.vstack((Jrlpelvis_v, Jrlpelvis_w))
-            J = np.block([[J_ll, np.zeros_like(J_ll)],
-                        [np.zeros_like(J_rl), J_rl]])
-
-            v = np.zeros((12, 1))
-            v[:3] = pxyz(0.0, 0.0, -0.15 * cos(t/2) * sin(t/2) / abs(sin(t/2))) if t/2 % (2 * pi) != 0 else pxyz(0, 0, 0)
-            e = np.vstack((ep_ll, er_ll, ep_rl, er_rl))
+        if t <= 3 or t >= 6:
+            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+        
+        else:
+            qlast = self.q
+            # dq = np.zeros((42, 1))
+            # dq[42] += 1e-3
+            # qlast += dq
+            (p_rh_pelvis, R_rh_pelvis, Jv_rh_pelvis, Jw_rh_pelvis) = self.chain_right_arm.fkin(self.get_some_q(qlast, 'right_arm')) 
+            (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
             
-            gamma = 0.1
-            Jinv_W = np.linalg.inv(np.transpose(J) @ J + gamma ** 2 * np.eye(12)) @ np.transpose(J)
-            qlast_modified = np.array([0, 0, 0, qlast[3,0], 0, 0, 0, 0, 0, qlast[9,0], 0, 0]).reshape(-1, 1)
-            qdot_s = 10*(self.qgoal - qlast_modified)
-            # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(12) - Jinv_W @ J) @ qdot_s
-            qdot = Jinv_W @ (v + self.lam * e)
+            pd_rh_pelvis = pxyz(0.44239, -0.28093 - 0.1 * (t-3), -0.084022 + 0.4 * (t-3))
+            v_rh_pelvis = pxyz(0, -0.1, 0.4)
+            Rd_rh_pelvis = R_from_quat(np.array([0.66249, 0.11349, -0.18655, 0.71654]))
+
+            pd_ll_pelvis = pxyz(0.1361, 0.115, -0.84695)
+            v_ll_pelvis = pxyz(0, 0, 0)
+            Rd_ll_pelvis = R_from_quat(np.array([0.99563, 0.0033751, 0.039847, -0.084332]))
+
+            # Jw_ll_pelvis *= 0
+            # Jv_ll_pelvis *= 0
+
+            # Right hand to pelvis task
+            J_rh_pelvis = np.vstack((Jv_rh_pelvis, Jw_rh_pelvis))
+            # v = np.zeros((6, 1))
+            # v[0:3] = v_rh_pelvis
+            # e_rh_pelvis = np.vstack((ep(pd_rh_pelvis, p_rh_pelvis), eR(Rd_rh_pelvis, R_rh_pelvis)))
+            # e = e_rh_pelvis
+
+            # left leg to pelvis task
+            J_ll_pelvis = np.vstack((Jv_ll_pelvis, Jw_ll_pelvis))
+            # v = np.zeros((6, 1))
+            # v[0:3] = v_ll_pelvis
+            # e_ll_pelvis = np.vstack((ep(pd_ll_pelvis, p_ll_pelvis), eR(Rd_ll_pelvis, R_ll_pelvis)))
+            # e = e_ll_pelvis
+
+            T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
+            T_rh_pelvis = T_from_Rp(R_rh_pelvis, p_rh_pelvis)
+            T_rh_ll = np.linalg.inv(T_ll_pelvis) @ T_rh_pelvis
+            p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
+            # print((p_rh_ll - self.p0_rh_ll)/1e-3)
+
+            Td_ll_pelvis = T_from_Rp(Rd_ll_pelvis, pd_ll_pelvis)
+            Td_rh_pelvis = T_from_Rp(Rd_rh_pelvis, pd_rh_pelvis)
+            Td_rh_ll = np.linalg.inv(Td_ll_pelvis) @ Td_rh_pelvis
+            pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
+            # print('position desired')
+            # print(p_rh_ll)
+            # print('rotation desired')
+            # print(Rd_rh_ll)
+
+            Jv_combined = np.hstack((-Jv_ll_pelvis, Jv_rh_pelvis)) + np.hstack(((crossmat(p_rh_ll) @ Jw_ll_pelvis), np.zeros_like(Jv_rh_pelvis)))
+            Jw_combined = np.hstack((-Jw_ll_pelvis, Jw_rh_pelvis))
+            J_combined = np.vstack((Jv_combined, Jw_combined))
+            J_combined[0:3] = np.transpose(R_ll_pelvis) @ J_combined[0:3]
+            J_combined[3:6] = np.transpose(R_ll_pelvis) @ J_combined[3:6]
+            v = np.zeros((6, 1))
+            v[0:3] = np.linalg.inv(Rd_ll_pelvis) @ v_rh_pelvis
+            # v[0:3] = v_rh_pelvis
+
+            e = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
+
+            J = np.block([
+                [J_combined[:,:6], np.zeros((6,6)), J_combined[:,6:9], np.zeros((6,15)), J_combined[:,9:], np.zeros((6,5))],
+                #  [J_ll_pelvis, np.zeros((6, 36))],
+                #  [np.zeros((6,12)), J_rh_pelvis[:,0:3], np.zeros((6,15)), J_rh_pelvis[:,3:], np.zeros((6,5))]
+            ])
+
+            gamma = 0
+            Jinv_W = np.transpose(J) @ np.linalg.inv(J @ np.transpose(J) + gamma ** 2 * np.eye(6))
+            qdot = Jinv_W @ (0 * v + self.lam * e)
+            # print('e:')
+            # print(e)
+            # print('J x qdot - e')
+            # print(J @ qdot - e)
             q = qlast + dt * qdot
-            self.q_left_leg = q[:6]
-            self.q_right_leg = q[6:]
-            self.q[:12] = q
-            self.qdot[:12] = qdot
+            self.q = q
+            self.qdot = qdot
 
             return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+
+        return None
         
         # return np.zeros((42, 1)).flatten().tolist(), np.zeros((42, 1)).flatten().tolist()
 
@@ -284,3 +323,138 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+
+
+
+#     [[ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    2.01875427e-01 -4.94850468e-02 -8.86694462e-03  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -3.67993622e-01 -4.48952155e-02
+#   -4.61137666e-02  8.59270179e-02  2.73650224e-18  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    4.83338733e-01 -5.79291525e-03  5.95756535e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -2.78735014e-02  5.46105963e-01
+#    2.08393753e-01  6.03117504e-02  2.18482719e-17  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    1.61845760e-02 -4.31650718e-01 -2.35651592e-01  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -4.56809921e-01  9.57462780e-03
+#   -3.20620487e-02  2.68422448e-01  2.56556248e-17  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#   -7.99146940e-02 -6.87247543e-02  9.97439911e-01  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -6.87247543e-02  8.64181656e-01
+#   -5.01354210e-01  2.13658225e-01 -9.52959673e-01 -5.32221220e-02
+#   -8.53277797e-02  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  9.97620444e-01  6.86008224e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  9.97620444e-01  6.22899599e-02
+#    2.21360971e-02 -9.65547661e-01 -1.72532595e-01  9.04654462e-01
+#   -4.25980811e-01  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    9.96801706e-01 -5.50973948e-03 -2.01878781e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -5.50973948e-03  4.99309550e-01
+#    8.64958930e-01  1.48552611e-01  2.49199448e-01  4.22809308e-01
+#    9.00699461e-01  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]]
+# [[ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    2.01875345e-01 -4.94649476e-02 -8.85841729e-03  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -3.67978320e-01 -4.48920130e-02
+#   -4.61118512e-02  8.59180341e-02 -4.50443335e-18  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    4.83338748e-01 -5.79028263e-03  5.95692313e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -2.78784241e-02  5.46105674e-01
+#    2.08394427e-01  6.03139804e-02 -9.96585852e-18  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    1.61845694e-02 -4.31652656e-01 -2.35644543e-01  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -4.56821208e-01  9.56847212e-03
+#   -3.20658041e-02  2.68424822e-01 -2.43682195e-17  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#   -7.99146940e-02 -6.87098889e-02  9.97441522e-01  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -6.87103967e-02  8.64166604e-01
+#   -5.01380871e-01  2.13648560e-01 -9.52969087e-01 -5.32290439e-02
+#   -8.53277533e-02  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  9.97621475e-01  6.85861888e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  9.97621297e-01  6.22888572e-02
+#    2.21478964e-02 -9.65547207e-01 -1.72525673e-01  9.04654387e-01
+#   -4.25980794e-01  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    9.96801706e-01 -5.50854770e-03 -2.01580169e-02  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00 -5.53427317e-03  4.99335738e-01
+#    8.64943173e-01  1.48569461e-01  2.49168240e-01  4.22808596e-01
+#    9.00699471e-01  0.00000000e+00  0.00000000e+00  0.00000000e+00
+#    0.00000000e+00  0.00000000e+00]]

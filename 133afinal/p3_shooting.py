@@ -59,7 +59,7 @@ joint_names = {
 }
 
 #
-#   Create the marker array to visualize.
+#   Create the marker array to visualize the basketball hoop.
 #
 def post(x, y, diameter, height):
     # Create the cyclinder marker.
@@ -86,31 +86,48 @@ def building_hoop():
     markers = []
 
     # Building the pole of the hoop
-    markers.append(post(1.0,  1.0, 0.1, 3.0))
+    markers.append(post(1.0 + 3,  1.0 - 1, 0.1, 3.0))
 
     # Building the backboard of the hoop
-    markers.append(line(1.0, 1.0, 3.0, 1.4, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0))
+    markers.append(line(1.0 + 3, 1.0 - 1, 3.0, 1.4, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0))
 
     # Build the Shooting box on the backboard
-    markers.append(line(1.35, 1.05, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(0.65, 1.05, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0, 1.05, 3.1-0.05, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.35 + 3, 1.05 - 1, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65 + 3, 1.05 - 1, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3, 1.05 - 1, 3.1-0.05, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
 
     # Build the Edge of the Backboard
-    markers.append(line(1.0, 1.05, 2.55, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0, 1.05, 3.45, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3, 1.05 - 1, 2.55, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3, 1.05 - 1, 3.45, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
     
-    markers.append(line(0.35, 1.05, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.65, 1.05, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.35 + 3, 1.05 - 1, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.65 + 3, 1.05 - 1, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
 
     # Building the rim of the hoop
-    markers.append(line(1.35, 1.4, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(0.65, 1.4, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0, 1.05, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0, 1.75, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.35 + 3, 1.4 - 1, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65 + 3, 1.4 - 1, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3, 1.05 - 1, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3, 1.75 - 1, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
 
     # Return the list of markers
     return markers
+
+def ball(radius, p, msg):
+     # Create the sphere marker.
+    diam        = 2 * radius
+    marker = Marker()
+    marker.header.frame_id  = "world"
+    marker.header.stamp     = msg
+    marker.action           = Marker.ADD
+    marker.ns               = "point"
+    marker.id               = 1
+    marker.type             = Marker.SPHERE
+    marker.pose.orientation = Quaternion()
+    marker.pose.position    = Point_from_p(p)
+    marker.scale            = Vector3(x = diam, y = diam, z = diam)
+    marker.color            = ColorRGBA(r=1.0, g=95.0/255.0, b=21.0/255.0, a=0.8)
+    return marker
+
 
 #
 #   Trajectory Generator Node Class
@@ -161,9 +178,6 @@ class GeneratorNode(Node):
                                (self.dt, rate))
 
 
-
-
-
         # Prepare the publisher (latching for new subscribers).
         quality = QoSProfile(durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              depth=1)
@@ -179,6 +193,13 @@ class GeneratorNode(Node):
         # Create the markers visualize.
         self.markers = building_hoop()
 
+        # Initialize the ball position, velocity, set the acceleration.
+        self.radius = 0.2
+
+        self.p = np.array([0.0-4.0, 0.0-4.0, 1.0+self.radius]).reshape((3,1))
+        self.v = np.array([1.0, 0.1,  5.0       ]).reshape((3,1))
+        self.a = np.array([0.0, 0.0, -9.81      ]).reshape((3,1))
+
         # Add the timestamp, frame, namespace, action, and id to each marker.
         timestamp = self.get_clock().now().to_msg()
         for (i,marker) in enumerate(self.markers):
@@ -186,12 +207,17 @@ class GeneratorNode(Node):
             marker.header.frame_id    = 'world'
             marker.ns                 = 'hoop'
             marker.action             = Marker.ADD
-            marker.id                 = i
+            marker.id                 = i+1
         
         # Create the marker array message and publish.
-        arraymsg = MarkerArray()
-        arraymsg.markers = self.markers
-        self.pub2.publish(arraymsg)
+        self.arraymsg = MarkerArray()
+
+        self.marker = ball(self.radius, self.p, self.get_clock().now().to_msg())
+
+        
+        self.arraymsg.markers = self.markers
+        self.arraymsg.markers.append(self.marker)
+        self.pub2.publish(self.arraymsg)
 
 
     # Shutdown
@@ -256,18 +282,27 @@ class GeneratorNode(Node):
         cmdmsg.velocity     = qdot              # List of joint velocities
         self.pub.publish(cmdmsg)
 
+        # Integrate the velocity, then the position.
+        self.v += self.dt * self.a
+        self.p += self.dt * self.v
+
+        # Check for a bounce - not the change in x velocity is non-physical.
+        if self.p[2,0] < self.radius:
+            self.p[2,0] = self.radius + (self.radius - self.p[2,0])
+            self.v[2,0] *= -1.0
+            self.v[0,0] *= -1.0   # Change x just for the fun of it!
+
+        # Update the ID number to create a new ball and leave the
+        # previous balls where they are.
+        #####################
+        # self.marker.id += 1
+        #####################
+
+        # Update the message and publish.
         now = self.start + Duration(seconds=self.t)
-        for (i,marker) in enumerate(self.markers):
-            marker.header.stamp       = now.to_msg()
-            marker.header.frame_id    = 'world'
-            marker.ns                 = 'hoop'
-            marker.action             = Marker.ADD
-            marker.id                 = i
-        
-        # Create the marker array message and publish.
-        arraymsg = MarkerArray()
-        arraymsg.markers = self.markers
-        self.pub2.publish(arraymsg)
+        self.marker.header.stamp  = now.to_msg()
+        self.marker.pose.position = Point_from_p(self.p)
+        self.pub2.publish(self.arraymsg)
 
 
 class Trajectory():
@@ -284,30 +319,44 @@ class Trajectory():
         # Initial q
         self.q = np.zeros((len(self.jointnames()), 1))
         self.qdot = np.zeros((len(self.jointnames()), 1))
-        self.q[joints.index('torsoYaw')], self.q[joints.index('torsoPitch')], self.q[joints.index('torsoRoll')] = -0.1, 0.1, 0
-        self.q[joints.index('lowerNeckPitch')], self.q[joints.index('neckYaw')], self.q[joints.index('upperNeckPitch')] = 0, 0, 0
-        self.q[joints.index('rightShoulderPitch')], self.q[joints.index('rightShoulderRoll')], self.q[joints.index('rightShoulderYaw')] = -0.543, 1.519, 0.2
-        self.q[joints.index('rightElbowPitch')] = 0.810
-        self.q[joints.index('rightForearmYaw')] = 0.965
-        self.q[joints.index('rightWristRoll')],  self.q[joints.index('rightWristPitch')],  self.q[joints.index('rightThumbRoll')] = -0.389, 0.231, 1.350
-        self.q[joints.index('leftShoulderPitch')], self.q[joints.index('leftShoulderRoll')], self.q[joints.index('leftShoulderYaw')] = -0.543, -1.549, 0.710
-        self.q[joints.index('leftElbowPitch')] = -0.847
-        self.q[joints.index('leftForearmYaw')] = 1.216
-        self.q[joints.index('leftWristRoll')],  self.q[joints.index('leftWristPitch')],  self.q[joints.index('leftThumbRoll')] = 0.235, -0.309, 0.675
-        self.q[joints.index('rightHipYaw')], self.q[joints.index('rightHipRoll')], self.q[joints.index('rightHipPitch')] = -0.40, 0, -0.935
-        self.q[joints.index('rightKneePitch')], self.q[joints.index('rightAnklePitch')], self.q[joints.index('rightAnkleRoll')] = 1.467, -0.452, 0
-        self.q[joints.index('leftHipYaw')], self.q[joints.index('leftHipRoll')], self.q[joints.index('leftHipPitch')] = -0.169, 0, -0.935
-        self.q[joints.index('leftKneePitch')], self.q[joints.index('leftAnklePitch')], self.q[joints.index('leftAnkleRoll')] = 1.467, -0.452, 0
+        # self.q[joints.index('torsoYaw')], self.q[joints.index('torsoPitch')], self.q[joints.index('torsoRoll')] = -0.1, 0.1, 0
+        # self.q[joints.index('lowerNeckPitch')], self.q[joints.index('neckYaw')], self.q[joints.index('upperNeckPitch')] = 0, 0, 0
+        # self.q[joints.index('rightShoulderPitch')], self.q[joints.index('rightShoulderRoll')], self.q[joints.index('rightShoulderYaw')] = -0.543, 1.519, 0.2
+        # self.q[joints.index('rightElbowPitch')] = 0.810
+        # self.q[joints.index('rightForearmYaw')] = 0.965
+        # self.q[joints.index('rightWristRoll')],  self.q[joints.index('rightWristPitch')],  self.q[joints.index('rightThumbRoll')] = -0.389, 0.231, 1.350
+        # self.q[joints.index('leftShoulderPitch')], self.q[joints.index('leftShoulderRoll')], self.q[joints.index('leftShoulderYaw')] = -0.543, -1.549, 0.710
+        # self.q[joints.index('leftElbowPitch')] = -0.847
+        # self.q[joints.index('leftForearmYaw')] = 1.216
+        # self.q[joints.index('leftWristRoll')],  self.q[joints.index('leftWristPitch')],  self.q[joints.index('leftThumbRoll')] = 0.235, -0.309, 0.675
+        # self.q[joints.index('rightHipYaw')], self.q[joints.index('rightHipRoll')], self.q[joints.index('rightHipPitch')] = -0.40, 0, -0.935
+        # self.q[joints.index('rightKneePitch')], self.q[joints.index('rightAnklePitch')], self.q[joints.index('rightAnkleRoll')] = 1.467, -0.452, 0
+        # self.q[joints.index('leftHipYaw')], self.q[joints.index('leftHipRoll')], self.q[joints.index('leftHipPitch')] = -0.169, 0, -0.935
+        # self.q[joints.index('leftKneePitch')], self.q[joints.index('leftAnklePitch')], self.q[joints.index('leftAnkleRoll')] = 1.467, -0.452, 0
+        self.q[joints.index('torsoPitch')] = 0.343
+        self.q[joints.index('leftShoulderPitch')], self.q[joints.index('rightShoulderPitch')] = -0.438, -0.438
+        self.q[joints.index('leftShoulderRoll')], self.q[joints.index('rightShoulderRoll')] = -1.5, 1.5
+        self.q[joints.index('rightHipYaw')], self.q[joints.index('leftHipYaw')] = -0.2, 0.2
+        self.q[joints.index('leftKneePitch')], self.q[joints.index('rightKneePitch')] = 1.664, 1.664
+        self.q[joints.index('leftAnklePitch')], self.q[joints.index('rightAnklePitch')] = -0.913, -0.913
+        self.q[joints.index('leftHipPitch')], self.q[joints.index('rightHipPitch')] = -0.739, -0.739
+        self.q[joints.index('leftForearmYaw')], self.q[joints.index('rightForearmYaw')] = 1.132, 1.132
+        self.q[joints.index('leftElbowPitch')], self.q[joints.index('rightElbowPitch')] = -1.579, 1.579
+        self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = 0.4, 0.4
+
         
         # Set up initial positions for the chain tips
-        self.p_ll_world, self.R_ll_world = (np.array([0.1361, 0.115, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.99563, 0.0033751, 0.039847, -0.084332])))
-        self.p_rl_world, self.R_rl_world = (np.array([0.10744, -0.18622, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.97928, 0.0079447, 0.039192, -0.19851])))
-        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.84695]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
+        # self.p_ll_world, self.R_ll_world = (np.array([0.1361, 0.115, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.99563, 0.0033751, 0.039847, -0.084332])))
+        # self.p_rl_world, self.R_rl_world = (np.array([0.10744, -0.18622, 1.0968e-06]).reshape((-1, 1)), R_from_quat(np.array([0.97928, 0.0079447, 0.039192, -0.19851])))
+        # self.p_pelvis_world, self.R_pelvis_world = (np.array([0, 0, 0.84695]).reshape((-1, 1)), R_from_quat(np.array([1, 0, 0, 0])))
+        self.y_offset = 1
+        self.p_ll_world, self.R_ll_world = (np.array([0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.77415, 0.0037979, 0.004645, -0.63297])))
+        self.p_rl_world, self.R_rl_world = (np.array([-0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.63297, 0.004645, 0.0037979, -0.77415])))
+        self.p_pelvis_world, self.R_pelvis_world = (np.array([0, + self.y_offset, 0.80111]).reshape((-1, 1)), Rotz(-pi/2))
 
         # Weighted matrix
         weights = np.ones(42)
-        # weights[joints.index('leftHipPitch')], weights[joints.index('rightHipPitch')] = 10, 10
-        # weights[joints.index('torsoRoll')], weights[joints.index('torsoPitch')], weights[joints.index('torsoYaw')]  = 10, 10, 10
+        weights[14] = 10
         W = np.diag(weights)
         self.M = np.linalg.inv(W @ W)
 
@@ -317,8 +366,9 @@ class Trajectory():
         self.qgoal = q0
 
         # Other constants
-        self.lam = 1
+        self.lam = 20
         self.lam_s = 20
+        self.shot_time = 1
 
     def get_some_q(self, q, chain):
         curr_joints = joint_names[chain]
@@ -334,7 +384,7 @@ class Trajectory():
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # Compute the joints.
-        if t <= 3 or t >= 6:
+        if t <= 3 or t >= 3 + self.shot_time:
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
 
             broadcast = self.node.broadcaster
@@ -350,7 +400,7 @@ class Trajectory():
             return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
         
         # Desired trajectory of right palm with respect to both legs:
-        elif 3 < t < 6:
+        else:
             # Broadcasting pelvis and left foot
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
             broadcast = self.node.broadcaster
@@ -363,14 +413,18 @@ class Trajectory():
             trans.transform       = Transform_from_T(Tpelvis)
             broadcast.sendTransform(trans)
 
-            p_lh_world = pxyz(0.4374, 0.072564, 0.75006 + 0.2)
-            v_lh_world = pxyz(0, 0, 0)
-            R_lh_world = R_from_quat(np.array([-0.31281, 0.053035, -0.046646, 0.94718]))
+            # Trajectory of right hand and left hand
+            # p_lh_world = pxyz(0.4374, 0.072564 - 0.1 * (t-3), 0.75006 + 0.3 * (t-3))
+            # R_lh_world = R_from_quat(np.array([-0.31281, 0.053035, -0.046646, 0.94718]))
+            p_lh_world = pxyz(0.15341 - 0.2 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.2 * (t-3))
+            R_lh_world = R_from_quat(np.array([0.2016, 0.17074, -0.00038883, 0.96447]))
+            v_lh_world = pxyz(-0.2, 0, 1.2)
 
-            p_rh_world = pxyz(0.44239, -0.28093, 0.76293 + 0.2)
-            v_rh_world = pxyz(0, 0, 0)
-            R_rh_world = R_from_quat(np.array([0.66249, 0.11349, -0.18655, 0.71654]))
-            wd = pxyz(0, 0, 0)
+            # p_rh_world = pxyz(0.44239, -0.28093 - 0.1 * (t-3), 0.76293 + 0.4 * (t-3))
+            # R_rh_world = R_from_quat(np.array([0.66249, 0.11349, -0.18655, 0.71654]))
+            p_rh_world = pxyz(-0.15341 - 0.15 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.3 * (t-3))
+            R_rh_world = R_from_quat(np.array([0.96447, 0.00038883, -0.17074, 0.2016]))
+            v_rh_world = pxyz(-0.15, 0, 1.3)
             
             # Fkin
             qlast = self.q
@@ -378,15 +432,6 @@ class Trajectory():
             (p_lh_pelvis, R_lh_pelvis, Jv_lh_pelvis, Jw_lh_pelvis) = self.chain_left_arm.fkin(self.get_some_q(qlast, 'left_arm')) 
             (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
             (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg'))
-
-            # print("qlast: ")
-            # print(qlast)
-            # print("get_some_method:")
-            # print(self.get_some_q(qlast, 'right_arm'))
-            # print("----")
-
-            #Jv_ll_pelvis *= 0
-            #Jw_ll_pelvis *= 0
 
             # T matrices based on desired positions
             T_rh_world = T_from_Rp(R_rh_world, p_rh_world)
@@ -427,60 +472,41 @@ class Trajectory():
             p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), R_from_T(T_pelvis_world)
 
             # Stacking Jacobians
-            J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
-                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
+            J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_rh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
         
-            # e_rh_ll = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
-            e_rh_ll = np.array([0, 0, 1, 0, 0, 0]).reshape((-1, 1))
+            e_rh_ll = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
 
-            J_lh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_lh_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_lh_pelvis)]])),
-                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_lh_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_lh_pelvis)]]))))
+            J_lh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_lh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_lh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_lh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_lh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_lh_pelvis)]]))))
             
             e_lh_ll = np.vstack((ep(pd_lh_ll, p_lh_ll), eR(Rd_lh_ll, R_lh_ll)))
 
-            J_rl_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rl_pelvis]]) - np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rl_pelvis)]])),
-                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rl_pelvis]]) - np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rl_pelvis)]]))))
+            J_rl_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rl_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_rl_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_rl_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rl_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_rl_pelvis)]]))))
 
             e_rl_ll = np.vstack((ep(pd_rl_ll, p_rl_ll), eR(Rd_rl_ll, R_rl_ll)))
 
-            J_ll_rh = np.vstack((np.transpose(R_rh_pelvis) @ (np.block([[Jv_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]]) - np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]])),
-                                np.transpose(R_rh_pelvis) @ (np.block([[Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]) - np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]))))
-                                
-            e_ll_rh = np.vstack((ep(pd_ll_rh, p_ll_rh), eR(Rd_ll_rh, R_ll_rh)))
 
-
-            v = np.zeros((6, 1))
-            # v[0:3] = np.transpose(self.R_ll_world) @ v_lh_world
-            # v[0:3] = (np.transpose(self.R_ll_world) @ v_rh_world)
-            # v[12:15] = np.transpose(self.R_ll_world) @ v_lh_world
-            # v[18:21] = R_ll_rh @ (-v[6:9])
-            e = np.vstack((e_rh_ll))
+            v = np.zeros((18, 1))
+            v[6:9] = np.transpose(self.R_ll_world) @ v_rh_world
+            v[9:12] = np.transpose(self.R_ll_world) @ v_lh_world
+            e = np.vstack((e_rl_ll, e_rh_ll, e_lh_ll))
 
             J = np.block([
-                # [J_rl_ll, np.zeros((6,30))],
+                [J_rl_ll, np.zeros((6,30))],
                 [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
-                # [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
-                # [J_ll_rh[:,:6], np.zeros((6,6)), J_ll_rh[:,6:9], np.zeros((6,15)), J_ll_rh[:,9:], np.zeros((6,5))]
+                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
             ])
 
-            # print(f'v[6:9]: {-R_ll_rh @ v[6:9]} \n v[18:21]: {v[18:21]}')
-            # print(f'v[9:12]: {-R_ll_rh @ v[9:12]} \n v[21:24]: {v[21:24]}')
-            # print(f'diff v: {(-R_ll_rh @ np.transpose(R_ll_pelvis) @ Jv_rh_pelvis) - (np.transpose(R_rh_pelvis) @ -Jv_rh_pelvis)} \n')
-            # print(f'diff w: {(-R_ll_rh @ np.transpose(R_ll_pelvis) @ Jw_rh_pelvis) - (np.transpose(R_rh_pelvis) @ -Jw_rh_pelvis)} \n')
-
-            gamma = 0.2
-            qdot_s = self.lam_s * (self.qgoal - qlast)
-            #print(f'{qdot_s} \n')
+            gamma = 0.15
             Jinv_W = np.linalg.inv(self.M @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M @ np.transpose(J)
             # qdot = Jinv_W @ (v + self.lam * e) + (np.eye(42) - Jinv_W @ J) @ qdot_s
             qdot = Jinv_W @ (v + self.lam * e)
-            # qdot = qdot_s
             q = qlast + dt * qdot
             self.q = q
             self.qdot = qdot
             self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
-            # check = np.array([(self.jointnames()[i], q[i]) for i in range(42)])
-            # print(check)
 
             return (q.flatten().tolist(), qdot.flatten().tolist())
 
