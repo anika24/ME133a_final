@@ -339,8 +339,13 @@ class Trajectory():
 
         # Weighted matrix
         weights = np.ones(42)
-        # weights[joints.index('rightKneePitch')] = 1.0
-        # weights[joints.index('leftKneePitch')] = 1.0
+        weights[joints.index('torsoPitch')] = 10
+        weights[joints.index('torsoRoll')] = 10
+        weights[joints.index('torsoYaw')] = 10
+        weights[joints.index('leftKneePitch')] = 0.5
+        weights[joints.index('rightKneePitch')] = 0.5
+        weights[joints.index('leftElbowPitch')] = 0.5
+        weights[joints.index('rightElbowPitch')] = 0.5
         W = np.diag(weights)
         self.M = np.linalg.inv(W @ W)
 
@@ -433,7 +438,6 @@ class Trajectory():
             pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
             pd_lh_ll, Rd_lh_ll = p_from_T(Td_lh_ll), R_from_T(Td_lh_ll)
             pd_rl_ll, Rd_rl_ll = p_from_T(Td_rl_ll), R_from_T(Td_rl_ll)
-            pd_ll_rh, Rd_ll_rh = p_from_T(Td_ll_rh), R_from_T(Td_ll_rh)
 
             # T matrices based on positions from fkin
             T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
@@ -445,12 +449,10 @@ class Trajectory():
             T_rh_ll = np.linalg.inv(T_ll_pelvis) @ T_rh_pelvis
             T_lh_ll = np.linalg.inv(T_ll_pelvis) @ T_lh_pelvis
             T_rl_ll = np.linalg.inv(T_ll_pelvis) @ T_rl_pelvis
-            T_ll_rh = np.linalg.inv(T_rh_pelvis) @ T_ll_pelvis
 
             p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
             p_lh_ll, R_lh_ll = p_from_T(T_lh_ll), R_from_T(T_lh_ll)
             p_rl_ll, R_rl_ll = p_from_T(T_rl_ll), R_from_T(T_rl_ll)
-            p_ll_rh, R_ll_rh = p_from_T(T_ll_rh), R_from_T(T_ll_rh)
             
             # Get new position of pelvis with respect to world
             T_pelvis_world = T_ll_world @ np.linalg.inv(T_ll_pelvis)
