@@ -14,6 +14,7 @@ from logging import PlaceHolder
 from turtle import goto
 import rclpy
 import numpy as np
+import random
 
 from math import pi, sin, cos, acos, atan2, sqrt, fmod, exp
 
@@ -94,6 +95,18 @@ def wheel(radius, x, y, z):
     marker.color            = ColorRGBA(r=0.0, g=0.0, b=0.0, a=1.0)
     return marker
 
+def circle(x, y, z, diameter, height):
+    # Create the cyclinder marker.
+    marker = Marker()
+    marker.type             = Marker.CYLINDER
+    marker.pose.orientation = Quaternion()
+    marker.pose.orientation.w = 0.5**0.5
+    marker.pose.orientation.x = -0.5**0.5
+    marker.pose.position    = Point(x = x, y = y, z = z)
+    marker.scale            = Vector3(x = diameter, y = diameter, z = height)
+    marker.color            = ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.5)
+    return marker
+
 def ball(radius, p, msg):
      # Create the sphere marker.
     diam        = 2 * radius
@@ -149,7 +162,9 @@ def build_ball_machine(markers):
     markers.append(wheel(0.05, 0.1+0.05, -3.45-0.05, 0.05))
     markers.append(wheel(0.05, 0.1+0.05, -4.45+0.05, 0.05))
 
-    markers.append(line(0.35, -3.45, 0.35, 0.4, 0.05, 0.4, 0.0, 0.0, 0.0, 0.5))
+    # markers.append(circle(0.35, -3.45, 0.35, 0.4, 0.1))
+    markers.append(circle(0.35, -3.45, 0.35, 0.4, 0.05))
+    #markers.append(line(0.35, -3.45, 0.35, 0.4, 0.05, 0.4, 0.0, 0.0, 0.0, 0.5))
     return markers
 
 
@@ -222,7 +237,8 @@ class GeneratorNode(Node):
 
         # Initialize the ball position, velocity, set the acceleration.
         self.radius = 0.15
-        self.p = np.array([0.0-4.0, 0.0-4.0, 1.0+self.radius]).reshape((3,1))
+
+        self.p = np.array([0.35, -3.45, 0.35]).reshape((3,1))
         self.v = np.array([1.0, 0.1,  5.0       ]).reshape((3,1))
         self.a = np.array([0.0, 0.0, -9.81      ]).reshape((3,1))
 
@@ -332,24 +348,42 @@ class Trajectory():
         self.q[joints.index('leftElbowPitch')], self.q[joints.index('rightElbowPitch')] = -1.579, 1.579
         self.q[joints.index('leftShoulderYaw')], self.q[joints.index('rightShoulderYaw')] = 0.4, 0.4
 
-        
         # Set up initial positions for the chain tips
         self.y_offset = 1
         self.p_ll_world, self.R_ll_world = (np.array([0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.77415, 0.0037979, 0.004645, -0.63297])))
         self.p_rl_world, self.R_rl_world = (np.array([-0.12899, 0.046633 + self.y_offset, 0.00011451]).reshape((-1, 1)), R_from_quat(np.array([0.63297, 0.004645, 0.0037979, -0.77415])))
         self.p_pelvis_world, self.R_pelvis_world = (np.array([0, + self.y_offset, 0.80111]).reshape((-1, 1)), Rotz(-pi/2))
 
+        # Saving initial Configuration
+        self.q0 = self.q.copy()
+        self.p0_pelvis_world, self.R0_pelvis_world = (np.array([0, + self.y_offset, 0.80111]).reshape((-1, 1)), Rotz(-pi/2))
+        self.p0_lh_world, self.R0_lh_world = (np.array([0.15341, -0.44027 + self.y_offset, 0.78005]).reshape((-1, 1)), R_from_quat(np.array([0.2016, 0.17074, -0.00038883, 0.96447])))
+        self.p0_rh_world, self.R0_rh_world = (np.array([-0.15341, -0.44027 + self.y_offset, 0.78005]).reshape((-1,1)), R_from_quat(np.array([0.96447, 0.00038883, -0.17074, 0.2016])))
+
         # Weighted matrix
-        weights = np.ones(42)
-        weights[joints.index('torsoPitch')] = 10
-        weights[joints.index('torsoRoll')] = 10
-        weights[joints.index('torsoYaw')] = 10
-        weights[joints.index('leftKneePitch')] = 0.5
-        weights[joints.index('rightKneePitch')] = 0.5
-        weights[joints.index('leftElbowPitch')] = 0.5
-        weights[joints.index('rightElbowPitch')] = 0.5
-        W = np.diag(weights)
-        self.M = np.linalg.inv(W @ W)
+        W1 = np.ones(42)
+        W1[joints.index('torsoPitch')] = 20
+        W1[joints.index('torsoRoll')] = 20
+        W1[joints.index('torsoYaw')] = 20
+        W1[joints.index('leftKneePitch')] = 0.8
+        W1[joints.index('rightKneePitch')] = 0.8
+        W1[joints.index('leftElbowPitch')] = 0.5
+        W1[joints.index('rightElbowPitch')] = 0.5
+        W1[joints.index('rightShoulderPitch')] = 0.75
+        W1[joints.index('leftShoulderYaw')] = 0.75
+        W1[joints.index('rightShoulderRoll')] = 0.75
+        W1_mat = np.diag(W1)
+        self.M1 = np.linalg.inv(W1_mat @ W1_mat)
+
+        W2 = np.ones(42)
+        # W2[joints.index('torsoPitch')] = 20
+        # W2[joints.index('torsoRoll')] = 20
+        # W2[joints.index('torsoYaw')] = 20
+        # W2[joints.index('leftElbowPitch')] = 2
+        # W2[joints.index('rightElbowPitch')] = 2
+        # W2[0:12] = 10
+        W2_mat = np.diag(W2)
+        self.M2 = np.linalg.inv(W2_mat @ W2_mat)
 
         # Goal vector for secondary task: Keep joints near beginning position
         self.qgoal = np.zeros((len(joints), 1))
@@ -361,9 +395,29 @@ class Trajectory():
         self.lam = 20
         self.lam_s = 20
         self.shot_time = 1.0
-        self.wait_time = 3.0
+        self.reset_time = 0.6
+        self.wait_time = 0.8
+        self.bounce_time = 3.0
         self.ball_air_time = 1.5
         self.arc_constant = -1.8
+        self.total_cycle = self.wait_time + self.shot_time + self.ball_air_time + self.bounce_time + self.reset_time
+        self.y_rand = -random.uniform(0.25, 1)
+        self.z_rand = np.random.choice([-0.3, 0.5]) * random.uniform(0.2, 1)
+        self.broadcast = self.node.broadcaster
+        self.p_end_lh_world = None
+        self.p_end_rh_world = None
+        
+
+    def goto_quadratic(self, t, T, p0, pf, a):
+        b = (pf - p0) / T - a * T
+        p = p0 + b * t + a * t ** 2
+        v =   b + 2 * a * t
+        return (p,v)
+
+    def goto_linear(self, t, T, p0, pf):
+        p = p0 + (pf - p0) * (t/T)
+        v = (pf - p0)
+        return (p, v)
 
     def get_some_q(self, q, chain):
         curr_joints = joint_names[chain]
@@ -378,85 +432,132 @@ class Trajectory():
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
+        # Updating t to be modded so repeats shooting in a cycle
+        t %= self.total_cycle
+
         # Compute the joints.
         if t <= self.wait_time:
+            # Broadcasting pelvis
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
-
-            broadcast = self.node.broadcaster
             now = self.node.now()
-
+            
             trans = TransformStamped()
             trans.header.stamp    = now.to_msg()
             trans.header.frame_id = 'world'
             trans.child_frame_id  = 'pelvis'
             trans.transform       = Transform_from_T(Tpelvis)
-            broadcast.sendTransform(trans)
+            self.broadcast.sendTransform(trans)
 
-            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+            # self.q = self.q0
+            pballmachhine = pxyz(0.35, -3.45, 0.35) # .reshape((3,1))
+            self.p_end_lh_world = pxyz(0.15341 + self.y_rand, -0.44027 + self.y_offset, 0.78005 + self.z_rand)
+            self.p_end_rh_world = pxyz(-0.15341 + self.y_rand, -0.44027 + self.y_offset, 0.78005 + self.z_rand)
+            
+            phands = (self.p_end_rh_world + self.p_end_lh_world)/2
+            T = self.wait_time
+
+            (presz, vresz) = self.goto_quadratic(t, T, pballmachhine[2], phands[2], self.arc_constant)
+            (presy, vresy) = self.goto_linear(t, T, pballmachhine[1], phands[1])
+            (presx, vresx) = self.goto_linear(t, T, pballmachhine[0], phands[0])
+            self.node.p = np.array([presx, presy, presz]).reshape((-1, 1))
+            self.node.v = np.array([vresx, vresy, vresz]).reshape((-1, 1))
+
+            # now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+    
+            # Trajectory of right hand and left hand using cubic splines
+            T = self.wait_time
+            (presz, vresz) = self.goto_linear(t, T, self.p0_rh_world[2], self.p_end_rh_world[2])
+            (presy, vresy) = self.goto_linear(t, T, self.p0_rh_world[1], self.p_end_rh_world[1])
+            (presx, vresx) = self.goto_linear(t, T, self.p0_rh_world[0], self.p_end_rh_world[0])
+            p_rh_world = [presx, presy, presz]
+            R_rh_world = self.R0_rh_world
+            v_rh_world = [vresx, vresy, vresz]
+            w_rh_world = pxyz(0, 0, 0)
+
+            (presz, vresz) = self.goto_linear(t, T, self.p0_lh_world[2], self.p_end_lh_world[2])
+            (presy, vresy) = self.goto_linear(t, T, self.p0_lh_world[1], self.p_end_lh_world[1])
+            (presx, vresx) = self.goto_linear(t, T, self.p0_lh_world[0], self.p_end_lh_world[0])
+            p_lh_world = [presx, presy, presz]
+            R_lh_world = self.R0_lh_world
+            v_lh_world = [vresx, vresy, vresz]
+            w_lh_world = pxyz(0, 0, 0)
+
+            # Fkin
+            qlast = self.q
+            (p_rh_pelvis, R_rh_pelvis, Jv_rh_pelvis, Jw_rh_pelvis) = self.chain_right_arm.fkin(self.get_some_q(qlast, 'right_arm')) 
+            (p_lh_pelvis, R_lh_pelvis, Jv_lh_pelvis, Jw_lh_pelvis) = self.chain_left_arm.fkin(self.get_some_q(qlast, 'left_arm')) 
+            (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
+            (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg'))
+
+            # T matrices based on desired positions
+            T_rh_world = T_from_Rp(R_rh_world, p_rh_world)
+            T_lh_world = T_from_Rp(R_lh_world, p_lh_world)
+            T_ll_world = T_from_Rp(self.R_ll_world, self.p_ll_world)
+            T_rl_world = T_from_Rp(self.R_rl_world, self.p_rl_world)
+
+            # Get desired positions of right hand and left hand w.r.t leg
+            Td_rh_ll = np.linalg.inv(T_ll_world) @ T_rh_world
+            Td_lh_ll = np.linalg.inv(T_ll_world) @ T_lh_world
+            Td_rl_ll = np.linalg.inv(T_ll_world) @ T_rl_world
+
+            pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
+            pd_lh_ll, Rd_lh_ll = p_from_T(Td_lh_ll), R_from_T(Td_lh_ll)
+            pd_rl_ll, Rd_rl_ll = p_from_T(Td_rl_ll), R_from_T(Td_rl_ll)
+
+            # T matrices based on positions from fkin
+            T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
+            T_rl_pelvis = T_from_Rp(R_rl_pelvis, p_rl_pelvis)
+            T_rh_pelvis = T_from_Rp(R_rh_pelvis, p_rh_pelvis)
+            T_lh_pelvis = T_from_Rp(R_lh_pelvis, p_lh_pelvis)
+
+            # Get current positions of right and left hand w.r.t left leg
+            T_rh_ll = np.linalg.inv(T_ll_pelvis) @ T_rh_pelvis
+            T_lh_ll = np.linalg.inv(T_ll_pelvis) @ T_lh_pelvis
+            T_rl_ll = np.linalg.inv(T_ll_pelvis) @ T_rl_pelvis
+
+            p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
+            p_lh_ll, R_lh_ll = p_from_T(T_lh_ll), R_from_T(T_lh_ll)
+            p_rl_ll, R_rl_ll = p_from_T(T_rl_ll), R_from_T(T_rl_ll)
+            
+            # Get new position of pelvis with respect to world
+            T_pelvis_world = T_ll_world @ np.linalg.inv(T_ll_pelvis)
+            p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), R_from_T(T_pelvis_world)
+
+            # Stacking Jacobians
+            J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_rh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
         
-        elif t >= self.wait_time + self.shot_time and t <= self.ball_air_time + self.wait_time + self.shot_time:
-            def goto_quadtratic(t, T, p0, pf, a):
-                b = (pf - p0) / T - a * T
-                p = p0 + b * t + a * t ** 2
-                v =   b + 2 * a * t
-                return (p,v)
+            e_rh_ll = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
 
-            def goto_linear(t, T, p0, pf):
-                p = p0 + (pf - p0) * (t/T)
-                v = (pf - p0)
-                return (p, v)
-
-
-            # Calculating the trajectory of the ball
-            p_lh_world = pxyz(0.15341 - 0.05 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.2 * (self.shot_time))
-            p_rh_world = pxyz(-0.15341 - 0.05 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.3 * (self.shot_time))
-            pinit = (p_lh_world + p_rh_world) / 2.0
+            J_lh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_lh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_lh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_lh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_lh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_lh_pelvis)]]))))
             
-            T = self.ball_air_time
-            
-            pfhoop = pxyz(0.0, -3.6, 2.6)
+            e_lh_ll = np.vstack((ep(pd_lh_ll, p_lh_ll), eR(Rd_lh_ll, R_lh_ll)))
 
-            (presz, vresz) = goto_quadtratic(t - (self.wait_time + self.shot_time), T, pinit[2], pfhoop[2], self.arc_constant)
-            (presy, vresy) = goto_linear(t - (self.wait_time + self.shot_time), T, pinit[1], pfhoop[1])
-            (presx, vresx) = goto_linear(t - (self.wait_time + self.shot_time), T, pinit[0], pfhoop[0])
-            self.node.p = np.array([presx, presy, presz]).reshape((3,1))
-            self.node.v = np.array([vresx, vresy, vresz]).reshape((3,1))
+            v = np.zeros((12, 1))
+            v[0:3] = np.transpose(self.R_ll_world) @ v_rh_world
+            v[6:9] = np.transpose(self.R_ll_world) @ v_lh_world
+            e = np.vstack((e_rh_ll, e_lh_ll))
 
-            # Update the message and publish.
-            now = self.node.start + Duration(seconds=t)
-            self.node.marker.header.stamp  = now.to_msg()
-            self.node.marker.pose.position = Point_from_p(self.node.p)
-            self.node.pub2.publish(self.node.arraymsg)
+            J = np.block([
+                [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
+                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
+            ])
 
-            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+            gamma = 0.15
+            Jinv_W = np.linalg.inv(self.M2 @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M2 @ np.transpose(J)
+            qdot = np.linalg.pinv(J) @ (v + self.lam * e)
+            q = qlast + dt * qdot
+            self.q = q
+            self.qdot = qdot
+            self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
 
-        elif t > self.ball_air_time + self.wait_time + self.shot_time :
-            # Integrate the velocity, then the position.
-            self.node.v[0, 0] = 0.0
-            self.node.v[1, 0] = 0.0
-
-            self.node.v += dt * self.node.a
-            self.node.p += dt * self.node.v
-
-            # Check for a bounce - not the change in x velocity is non-physical.
-            if self.node.p[2,0] < self.node.radius:
-                self.node.p[2,0] = self.node.radius + (self.node.radius - self.node.p[2,0])
-                self.node.v[2,0] *= -0.8
-                self.node.v[0,0] *= -0.8
-
-            # Update the message and publish.
-            now = self.node.start + Duration(seconds=t)
-            self.node.marker.header.stamp  = now.to_msg()
-            self.node.marker.pose.position = Point_from_p(self.node.p)
-            self.node.pub2.publish(self.node.arraymsg)
-
-            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
-
-        # Desired trajectory of right palm with respect to both legs:
-        else:
-            # Broadcasting pelvis and left foot
+        elif t <= self.wait_time + self.reset_time:
+            # Broadcasting pelvis
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
-            broadcast = self.node.broadcaster
             now = self.node.now()
             
             trans = TransformStamped()
@@ -464,18 +565,125 @@ class Trajectory():
             trans.header.frame_id = 'world'
             trans.child_frame_id  = 'pelvis'
             trans.transform       = Transform_from_T(Tpelvis)
-            broadcast.sendTransform(trans)
+            self.broadcast.sendTransform(trans)
 
-            # Trajectory of right hand and left hand
-            p_lh_world = pxyz(0.15341 - 0.05 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.2 * (t-3))
-            R_lh_world = R_from_quat(np.array([0.2016, 0.17074, -0.00038883, 0.96447]))
-            v_lh_world = pxyz(-0.05, 0, 1.2)
+            # Trajectory of right hand and left hand using cubic splines
+            T = self.reset_time
+            (presz, vresz) = goto(t-self.wait_time, T, self.p_end_rh_world[2], self.p0_rh_world[2])
+            (presy, vresy) = goto(t-self.wait_time, T, self.p_end_rh_world[1], self.p0_rh_world[1])
+            (presx, vresx) = goto(t-self.wait_time, T, self.p_end_rh_world[0], self.p0_rh_world[0])
+            p_rh_world = [presx, presy, presz]
+            R_rh_world = self.R0_rh_world
+            v_rh_world = [vresx, vresy, vresz]
+            w_rh_world = pxyz(0, 0, 0)
+
+            (presz, vresz) = goto(t-self.wait_time, T, self.p_end_lh_world[2], self.p0_lh_world[2])
+            (presy, vresy) = goto(t-self.wait_time, T, self.p_end_lh_world[1], self.p0_lh_world[1])
+            (presx, vresx) = goto(t-self.wait_time, T, self.p_end_lh_world[0], self.p0_lh_world[0])
+            p_lh_world = [presx, presy, presz]
+            R_lh_world = self.R0_lh_world
+            v_lh_world = [vresx, vresy, vresz]
             w_lh_world = pxyz(0, 0, 0)
             
-            p_rh_world = pxyz(-0.15341 - 0.05 * (t-3), -0.44027 + self.y_offset, 0.78005 + 1.3 * (t-3))
+            # Fkin
+            qlast = self.q
+            (p_rh_pelvis, R_rh_pelvis, Jv_rh_pelvis, Jw_rh_pelvis) = self.chain_right_arm.fkin(self.get_some_q(qlast, 'right_arm')) 
+            (p_lh_pelvis, R_lh_pelvis, Jv_lh_pelvis, Jw_lh_pelvis) = self.chain_left_arm.fkin(self.get_some_q(qlast, 'left_arm')) 
+            (p_ll_pelvis, R_ll_pelvis, Jv_ll_pelvis, Jw_ll_pelvis) = self.chain_left_leg.fkin(self.get_some_q(qlast, 'left_leg')) 
+            (p_rl_pelvis, R_rl_pelvis, Jv_rl_pelvis, Jw_rl_pelvis) = self.chain_right_leg.fkin(self.get_some_q(qlast, 'right_leg'))
+
+            # T matrices based on desired positions
+            T_rh_world = T_from_Rp(R_rh_world, p_rh_world)
+            T_lh_world = T_from_Rp(R_lh_world, p_lh_world)
+            T_ll_world = T_from_Rp(self.R_ll_world, self.p_ll_world)
+            T_rl_world = T_from_Rp(self.R_rl_world, self.p_rl_world)
+
+            # Get desired positions of right hand and left hand w.r.t leg
+            Td_rh_ll = np.linalg.inv(T_ll_world) @ T_rh_world
+            Td_lh_ll = np.linalg.inv(T_ll_world) @ T_lh_world
+            Td_rl_ll = np.linalg.inv(T_ll_world) @ T_rl_world
+
+            pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
+            pd_lh_ll, Rd_lh_ll = p_from_T(Td_lh_ll), R_from_T(Td_lh_ll)
+            pd_rl_ll, Rd_rl_ll = p_from_T(Td_rl_ll), R_from_T(Td_rl_ll)
+
+            # T matrices based on positions from fkin
+            T_ll_pelvis = T_from_Rp(R_ll_pelvis, p_ll_pelvis)
+            T_rl_pelvis = T_from_Rp(R_rl_pelvis, p_rl_pelvis)
+            T_rh_pelvis = T_from_Rp(R_rh_pelvis, p_rh_pelvis)
+            T_lh_pelvis = T_from_Rp(R_lh_pelvis, p_lh_pelvis)
+
+            # Get current positions of right and left hand w.r.t left leg
+            T_rh_ll = np.linalg.inv(T_ll_pelvis) @ T_rh_pelvis
+            T_lh_ll = np.linalg.inv(T_ll_pelvis) @ T_lh_pelvis
+            T_rl_ll = np.linalg.inv(T_ll_pelvis) @ T_rl_pelvis
+
+            p_rh_ll, R_rh_ll = p_from_T(T_rh_ll), R_from_T(T_rh_ll)
+            p_lh_ll, R_lh_ll = p_from_T(T_lh_ll), R_from_T(T_lh_ll)
+            p_rl_ll, R_rl_ll = p_from_T(T_rl_ll), R_from_T(T_rl_ll)
+            
+            # Get new position of pelvis with respect to world
+            T_pelvis_world = T_ll_world @ np.linalg.inv(T_ll_pelvis)
+            p_pelvis_world, R_pelvis_world = p_from_T(T_pelvis_world), R_from_T(T_pelvis_world)
+
+            # Stacking Jacobians
+            J_rh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_rh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_rh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_rh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_rh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_rh_pelvis)]]))))
+        
+            e_rh_ll = np.vstack((ep(pd_rh_ll, p_rh_ll), eR(Rd_rh_ll, R_rh_ll)))
+
+            J_lh_ll = np.vstack((np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jv_ll_pelvis), Jv_lh_pelvis]]) + np.block([[-Jv_ll_pelvis + crossmat(p_lh_ll) @ Jw_ll_pelvis, np.zeros_like(Jv_lh_pelvis)]])),
+                                np.transpose(R_ll_pelvis) @ (np.block([[np.zeros_like(Jw_ll_pelvis), Jw_lh_pelvis]]) + np.block([[-Jw_ll_pelvis, np.zeros_like(Jw_lh_pelvis)]]))))
+            
+            e_lh_ll = np.vstack((ep(pd_lh_ll, p_lh_ll), eR(Rd_lh_ll, R_lh_ll)))
+
+            v = np.zeros((12, 1))
+            v[0:3] = np.transpose(self.R_ll_world) @ v_rh_world
+            v[6:9] = np.transpose(self.R_ll_world) @ v_lh_world
+            e = np.vstack((e_rh_ll, e_lh_ll))
+
+            J = np.block([
+                [J_rh_ll[:,:6], np.zeros((6,6)), J_rh_ll[:,6:9], np.zeros((6,15)), J_rh_ll[:,9:], np.zeros((6,5))],
+                [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
+            ])
+
+            gamma = 0.15
+            Jinv_W = np.linalg.inv(self.M2 @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M2 @ np.transpose(J)
+            qdot = Jinv_W @ (v + self.lam * e) 
+            q = qlast + dt * qdot
+            self.q = q
+            self.qdot = qdot
+            self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
+
+            self.node.p = (np.array(p_rh_world).reshape((-1,1)) + np.array(p_lh_world).reshape((-1,1))) / 2
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+
+        elif t <= self.wait_time + self.shot_time + self.reset_time:
+            # Broadcasting pelvis
+            Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
+            now = self.node.now()
+            
+            trans = TransformStamped()
+            trans.header.stamp    = now.to_msg()
+            trans.header.frame_id = 'world'
+            trans.child_frame_id  = 'pelvis'
+            trans.transform       = Transform_from_T(Tpelvis)
+            self.broadcast.sendTransform(trans)
+
+            # Trajectory of right hand and left hand
+            p_lh_world = pxyz(0.15341 - 0.05 * (t-self.wait_time-self.reset_time), -0.44027 + self.y_offset, 0.78005 + 1.15 * (t-self.wait_time-self.reset_time))
+            R_lh_world = R_from_quat(np.array([0.2016, 0.17074, -0.00038883, 0.96447]))
+            v_lh_world = pxyz(-0.05, 0, 1.15)
+            w_lh_world = pxyz(0, 0, 0)
+            
+            p_rh_world = pxyz(-0.15341 - 0.1 * (t-self.wait_time-self.reset_time), -0.44027 + self.y_offset, 0.78005 + 1.25 * (t-self.wait_time-self.reset_time))
             R_rh_world = R_from_quat(np.array([0.96447, 0.00038883, -0.17074, 0.2016]))
-            v_rh_world = pxyz(-0.05, 0, 1.3)
-            alpha, alphadot = 1.0 * (t-3), 1.0
+            v_rh_world = pxyz(-0.1, 0, 1.25)
+            alpha, alphadot = -1.0 * (t-3), -1.0
             R_rh_world = Roty(alpha)
             w_rh_world = ey() * alphadot
             
@@ -496,7 +704,6 @@ class Trajectory():
             Td_rh_ll = np.linalg.inv(T_ll_world) @ T_rh_world
             Td_lh_ll = np.linalg.inv(T_ll_world) @ T_lh_world
             Td_rl_ll = np.linalg.inv(T_ll_world) @ T_rl_world
-            Td_ll_rh = np.linalg.inv(T_rh_world) @ T_ll_world
 
             pd_rh_ll, Rd_rh_ll = p_from_T(Td_rh_ll), R_from_T(Td_rh_ll)
             pd_lh_ll, Rd_lh_ll = p_from_T(Td_lh_ll), R_from_T(Td_lh_ll)
@@ -551,38 +758,39 @@ class Trajectory():
                 [J_lh_ll[:,:6], np.zeros((6,6)), J_lh_ll[:,6:9], np.zeros((6,3)), J_lh_ll[:,9:], np.zeros((6,17))],
             ])
 
-            gamma = 0.15
+            gamma = 0.1
             qlast_modified = np.zeros((42, 1))
             qlast_modified[12:15] = qlast[12:15]
             qdot_s = self.lam_s * (self.qgoal - qlast_modified)
-            Jinv_W = np.linalg.inv(self.M @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M @ np.transpose(J)
-            qdot = Jinv_W @ (v + self.lam * e) + (np.eye(42) - Jinv_W @ J) @ qdot_s
-            # qdot = Jinv_W @ (v + self.lam * e)
+            Jinv_W = np.linalg.inv(self.M1 @ np.transpose(J) @ J + gamma ** 2 * np.eye(42)) @ self.M1 @ np.transpose(J)
+            qdot = Jinv_W @ (v + self.lam * e) + (np.diag(np.ones(42)) - Jinv_W @ J) @ qdot_s
             q = qlast + dt * qdot
-            # print(q[12:15])
-            # print(q[self.jointnames().index('rightForearmYaw')])
             self.q = q
             self.qdot = qdot
             self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
 
-
-
-            # # Integrate the velocity, then the position.
-            # self.node.v += dt * self.node.a
-            # self.node.p += dt * self.node.v
-
-            # # Check for a bounce - not the change in x velocity is non-physical.
-            # if self.node.p[2,0] < self.node.radius:
-            #     self.node.p[2,0] = self.node.radius + (self.node.radius - self.node.p[2,0])
-            #     self.node.v[2,0] *= -1.0
-            #     self.node.v[0,0] *= -1.0   # Change x just for the fun of it!
             self.node.p = (p_lh_world + p_rh_world) /2.0
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+        
+        elif t <= self.ball_air_time + self.wait_time + self.shot_time + self.reset_time:
+            # Calculating the trajectory of the ball
+            p_lh_world = pxyz(0.15341 - 0.05 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.15 * (self.shot_time))
+            p_rh_world = pxyz(-0.15341 - 0.1 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.25 * (self.shot_time))
+            pinit = (p_lh_world + p_rh_world) / 2.0
+            
+            T = self.ball_air_time
+            
+            pfhoop = pxyz(0.0, -3.6, 2.6)
 
-            # Update the ID number to create a new ball and leave the
-            # previous balls where they are.
-            #####################
-            # self.marker.id += 1
-            #####################
+            (presz, vresz) = self.goto_quadratic(t - (self.wait_time + self.shot_time + self.reset_time), T, pinit[2], pfhoop[2], self.arc_constant)
+            (presy, vresy) = self.goto_linear(t - (self.wait_time + self.shot_time + self.reset_time), T, pinit[1], pfhoop[1])
+            (presx, vresx) = self.goto_linear(t - (self.wait_time + self.shot_time + self.reset_time), T, pinit[0], pfhoop[0])
+            self.node.p = np.array([presx, presy, presz]).reshape((3,1))
+            self.node.v = np.array([vresx, vresy, vresz]).reshape((3,1))
 
             # Update the message and publish.
             now = self.node.start + Duration(seconds=t)
@@ -590,9 +798,43 @@ class Trajectory():
             self.node.marker.pose.position = Point_from_p(self.node.p)
             self.node.pub2.publish(self.node.arraymsg)
 
+        elif t <= self.ball_air_time + self.wait_time + self.shot_time + self.reset_time + self.bounce_time:
+            # Integrate the velocity, then the position.
+            self.node.v[0, 0] = 0.0
+            self.node.v[1, 0] = 0.0
 
+            self.node.v += dt * self.node.a
+            self.node.p += dt * self.node.v
 
-            return (q.flatten().tolist(), qdot.flatten().tolist())
+            # Check for a bounce - not the change in x velocity is non-physical.
+            if self.node.p[2,0] < self.node.radius:
+                self.node.p[2,0] = self.node.radius + (self.node.radius - self.node.p[2,0])
+                self.node.v[2,0] *= -0.8
+                self.node.v[0,0] *= -0.8
+
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+
+            # Reset everything
+            self.q = self.q0
+            self.qdot = np.zeros((42, 1))
+            self.p_pelvis_world, self.R_pelvis_world = self.p0_pelvis_world, self.R0_pelvis_world
+            self.y_rand = np.random.choice([-0.8, 0.8]) * random.uniform(0.4, 0.9)
+            self.z_rand = np.random.choice([-0.3, 0.8]) * random.uniform(0.3, 0.8)
+
+            Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
+            now = self.node.now()
+            trans = TransformStamped()
+            trans.header.stamp    = now.to_msg()
+            trans.header.frame_id = 'world'
+            trans.child_frame_id  = 'pelvis'
+            trans.transform       = Transform_from_T(Tpelvis)
+            self.broadcast.sendTransform(trans)
+
+        return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
 
 #
 #  Main Code
