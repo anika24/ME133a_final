@@ -10,6 +10,8 @@
 
 '''
 
+from logging import PlaceHolder
+from turtle import goto
 import rclpy
 import numpy as np
 
@@ -66,7 +68,7 @@ def post(x, y, diameter, height):
     marker = Marker()
     marker.type             = Marker.CYLINDER
     marker.pose.orientation = Quaternion()
-    marker.pose.position    = Point(x = x-4, y = y-4, z = height/2)
+    marker.pose.position    = Point(x = x, y = y, z = height/2)
     marker.scale            = Vector3(x = diameter, y = diameter, z = height)
     marker.color            = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
     return marker
@@ -76,41 +78,21 @@ def line(x, y, z, lx, ly, lz, cr, cg, cb, ca):
     marker = Marker()
     marker.type             = Marker.CUBE
     marker.pose.orientation = Quaternion()
-    marker.pose.position    = Point(x = x-4, y = y-4, z = z)
+    marker.pose.position    = Point(x = x, y = y, z = z)
     marker.scale            = Vector3(x = lx, y = ly, z = lz)
     marker.color            = ColorRGBA(r=cr, g=cg, b=cb, a=ca)
     return marker
 
-def building_hoop():
-    # Start with an empty marker list.
-    markers = []
-
-    # Building the pole of the hoop
-    markers.append(post(1.0 + 3,  1.0 - 1, 0.1, 3.0))
-
-    # Building the backboard of the hoop
-    markers.append(line(1.0 + 3, 1.0 - 1, 3.0, 1.4, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0))
-
-    # Build the Shooting box on the backboard
-    markers.append(line(1.35 + 3, 1.05 - 1, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(0.65 + 3, 1.05 - 1, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0 + 3, 1.05 - 1, 3.1-0.05, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-
-    # Build the Edge of the Backboard
-    markers.append(line(1.0 + 3, 1.05 - 1, 2.55, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0 + 3, 1.05 - 1, 3.45, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-    
-    markers.append(line(0.35 + 3, 1.05 - 1, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.65 + 3, 1.05 - 1, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
-
-    # Building the rim of the hoop
-    markers.append(line(1.35 + 3, 1.4 - 1, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(0.65 + 3, 1.4 - 1, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0 + 3, 1.05 - 1, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-    markers.append(line(1.0 + 3, 1.75 - 1, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
-
-    # Return the list of markers
-    return markers
+def wheel(radius, x, y, z):
+     # Create the sphere marker.
+    diam        = 2 * radius
+    marker = Marker()
+    marker.type             = Marker.SPHERE
+    marker.pose.orientation = Quaternion()
+    marker.pose.position    = Point(x = x, y = y, z = z)
+    marker.scale            = Vector3(x = diam, y = diam, z = diam)
+    marker.color            = ColorRGBA(r=0.0, g=0.0, b=0.0, a=1.0)
+    return marker
 
 def ball(radius, p, msg):
      # Create the sphere marker.
@@ -127,6 +109,48 @@ def ball(radius, p, msg):
     marker.scale            = Vector3(x = diam, y = diam, z = diam)
     marker.color            = ColorRGBA(r=1.0, g=95.0/255.0, b=21.0/255.0, a=0.8)
     return marker
+
+def building_hoop():
+    # Start with an empty marker list.
+    markers = []
+
+    # Building the pole of the hoop
+    markers.append(post(1.0 + 3-4.0,  1.0 - 1-4.0, 0.1, 3.0))
+
+    # Building the backboard of the hoop
+    markers.append(line(1.0 + 3-4.0, 1.0 - 1-4.0, 3.0, 1.4, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0))
+
+    # Build the Shooting box on the backboard
+    markers.append(line(1.35 + 3-4.0, 1.05 - 1-4.0, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65 + 3-4.0, 1.05 - 1-4.0, 2.85, 0.1, 0.1, 0.5, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3-4.0, 1.05 - 1-4.0, 3.1-0.05, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+
+    # Build the Edge of the Backboard
+    markers.append(line(1.0 + 3-4.0, 1.05 - 1-4.0, 2.55, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3-4.0, 1.05 - 1-4.0, 3.45, 1.4, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    
+    markers.append(line(0.35 + 3-4.0, 1.05 - 1-4.0, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.65 + 3-4.0, 1.05 - 1-4.0, 3.00, 0.1, 0.1, 1.0, 1.0, 0.0, 0.0, 1.0))
+
+    # Building the rim of the hoop
+    markers.append(line(1.35 + 3-4.0, 1.4 - 1-4.0, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(0.65 + 3-4.0, 1.4 - 1-4.0, 2.6, 0.1, 0.7, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3-4.0, 1.05 - 1-4.0, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+    markers.append(line(1.0 + 3-4.0, 1.75 - 1-4.0, 2.6, 0.7, 0.1, 0.1, 1.0, 0.0, 0.0, 1.0))
+
+    # Return the list of markers
+    return markers
+
+def build_ball_machine(markers):
+    markers.append(line(0.35, -3.95, 0.35, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 1.0))
+
+    markers.append(wheel(0.05, 0.6-0.05, -3.45-0.05, 0.05))
+    markers.append(wheel(0.05, 0.6-0.05, -4.45+0.05, 0.05))
+    markers.append(wheel(0.05, 0.1+0.05, -3.45-0.05, 0.05))
+    markers.append(wheel(0.05, 0.1+0.05, -4.45+0.05, 0.05))
+
+    markers.append(line(0.35, -3.45, 0.35, 0.4, 0.05, 0.4, 0.0, 0.0, 0.0, 0.5))
+    return markers
 
 
 #
@@ -190,12 +214,14 @@ class GeneratorNode(Node):
         #    pass
         self.get_logger().info("Got Passed . . . ")
 
-        # Create the markers visualize.
+        # Build the Basketball Hoop.
         self.markers = building_hoop()
 
-        # Initialize the ball position, velocity, set the acceleration.
-        self.radius = 0.2
+        # Build the Ball Machine
+        self.markers = build_ball_machine(self.markers)
 
+        # Initialize the ball position, velocity, set the acceleration.
+        self.radius = 0.15
         self.p = np.array([0.0-4.0, 0.0-4.0, 1.0+self.radius]).reshape((3,1))
         self.v = np.array([1.0, 0.1,  5.0       ]).reshape((3,1))
         self.a = np.array([0.0, 0.0, -9.81      ]).reshape((3,1))
@@ -214,7 +240,6 @@ class GeneratorNode(Node):
 
         self.marker = ball(self.radius, self.p, self.get_clock().now().to_msg())
 
-        
         self.arraymsg.markers = self.markers
         self.arraymsg.markers.append(self.marker)
         self.pub2.publish(self.arraymsg)
@@ -282,29 +307,6 @@ class GeneratorNode(Node):
         cmdmsg.velocity     = qdot              # List of joint velocities
         self.pub.publish(cmdmsg)
 
-        # Integrate the velocity, then the position.
-        self.v += self.dt * self.a
-        self.p += self.dt * self.v
-
-        # Check for a bounce - not the change in x velocity is non-physical.
-        if self.p[2,0] < self.radius:
-            self.p[2,0] = self.radius + (self.radius - self.p[2,0])
-            self.v[2,0] *= -1.0
-            self.v[0,0] *= -1.0   # Change x just for the fun of it!
-
-        # Update the ID number to create a new ball and leave the
-        # previous balls where they are.
-        #####################
-        # self.marker.id += 1
-        #####################
-
-        # Update the message and publish.
-        now = self.start + Duration(seconds=self.t)
-        self.marker.header.stamp  = now.to_msg()
-        self.marker.pose.position = Point_from_p(self.p)
-        self.pub2.publish(self.arraymsg)
-
-
 class Trajectory():
     # Initialization.
     def __init__(self, node):
@@ -358,7 +360,10 @@ class Trajectory():
         # Other constants
         self.lam = 20
         self.lam_s = 20
-        self.shot_time = 1
+        self.shot_time = 1.0
+        self.wait_time = 3.0
+        self.ball_air_time = 1.5
+        self.arc_constant = -1.8
 
     def get_some_q(self, q, chain):
         curr_joints = joint_names[chain]
@@ -374,12 +379,12 @@ class Trajectory():
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # Compute the joints.
-        if t <= 3 or t >= 3 + self.shot_time:
+        if t <= self.wait_time:
             Tpelvis = T_from_Rp(self.R_pelvis_world, self.p_pelvis_world)
 
             broadcast = self.node.broadcaster
             now = self.node.now()
-            
+
             trans = TransformStamped()
             trans.header.stamp    = now.to_msg()
             trans.header.frame_id = 'world'
@@ -389,6 +394,64 @@ class Trajectory():
 
             return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
         
+        elif t >= self.wait_time + self.shot_time and t <= self.ball_air_time + self.wait_time + self.shot_time:
+            def goto_quadtratic(t, T, p0, pf, a):
+                b = (pf - p0) / T - a * T
+                p = p0 + b * t + a * t ** 2
+                v =   b + 2 * a * t
+                return (p,v)
+
+            def goto_linear(t, T, p0, pf):
+                p = p0 + (pf - p0) * (t/T)
+                v = (pf - p0)
+                return (p, v)
+
+
+            # Calculating the trajectory of the ball
+            p_lh_world = pxyz(0.15341 - 0.05 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.2 * (self.shot_time))
+            p_rh_world = pxyz(-0.15341 - 0.05 * (self.shot_time), -0.44027 + self.y_offset, 0.78005 + 1.3 * (self.shot_time))
+            pinit = (p_lh_world + p_rh_world) / 2.0
+            
+            T = self.ball_air_time
+            
+            pfhoop = pxyz(0.0, -3.6, 2.6)
+
+            (presz, vresz) = goto_quadtratic(t - (self.wait_time + self.shot_time), T, pinit[2], pfhoop[2], self.arc_constant)
+            (presy, vresy) = goto_linear(t - (self.wait_time + self.shot_time), T, pinit[1], pfhoop[1])
+            (presx, vresx) = goto_linear(t - (self.wait_time + self.shot_time), T, pinit[0], pfhoop[0])
+            self.node.p = np.array([presx, presy, presz]).reshape((3,1))
+            self.node.v = np.array([vresx, vresy, vresz]).reshape((3,1))
+
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+
+            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+
+        elif t > self.ball_air_time + self.wait_time + self.shot_time :
+            # Integrate the velocity, then the position.
+            self.node.v[0, 0] = 0.0
+            self.node.v[1, 0] = 0.0
+
+            self.node.v += dt * self.node.a
+            self.node.p += dt * self.node.v
+
+            # Check for a bounce - not the change in x velocity is non-physical.
+            if self.node.p[2,0] < self.node.radius:
+                self.node.p[2,0] = self.node.radius + (self.node.radius - self.node.p[2,0])
+                self.node.v[2,0] *= -0.8
+                self.node.v[0,0] *= -0.8
+
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+
+            return (self.q.flatten().tolist(), self.qdot.flatten().tolist())
+
         # Desired trajectory of right palm with respect to both legs:
         else:
             # Broadcasting pelvis and left foot
@@ -501,6 +564,33 @@ class Trajectory():
             self.q = q
             self.qdot = qdot
             self.p_pelvis_world, self.R_pelvis_world = p_pelvis_world, R_pelvis_world
+
+
+
+            # # Integrate the velocity, then the position.
+            # self.node.v += dt * self.node.a
+            # self.node.p += dt * self.node.v
+
+            # # Check for a bounce - not the change in x velocity is non-physical.
+            # if self.node.p[2,0] < self.node.radius:
+            #     self.node.p[2,0] = self.node.radius + (self.node.radius - self.node.p[2,0])
+            #     self.node.v[2,0] *= -1.0
+            #     self.node.v[0,0] *= -1.0   # Change x just for the fun of it!
+            self.node.p = (p_lh_world + p_rh_world) /2.0
+
+            # Update the ID number to create a new ball and leave the
+            # previous balls where they are.
+            #####################
+            # self.marker.id += 1
+            #####################
+
+            # Update the message and publish.
+            now = self.node.start + Duration(seconds=t)
+            self.node.marker.header.stamp  = now.to_msg()
+            self.node.marker.pose.position = Point_from_p(self.node.p)
+            self.node.pub2.publish(self.node.arraymsg)
+
+
 
             return (q.flatten().tolist(), qdot.flatten().tolist())
 
